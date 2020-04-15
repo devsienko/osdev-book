@@ -2,7 +2,7 @@ org		0x7c00					; We are loaded by BIOS at 0x7C00
 
 jmp start
 
-; Заголовок ListFS
+; ListFS Header
 align 4
 fs_magic dd ?
 fs_version dd ?
@@ -14,7 +14,7 @@ fs_map_size dq ?
 fs_first_file dq ?
 fs_uid dq ?
 fs_block_size dd ?
-; Заголовок файла
+; File Header
 virtual at 0x800
 f_info:
 	f_name rb 256
@@ -29,9 +29,15 @@ f_info:
 	f_atime dq ?
 end virtual
 
-boot_msg db "My OS boot loader. Version 0.01",13,10,0
+; bootloader data
+label sector_per_track word at $$ ; number of sectors per track
+label head_count byte at $$ + 2 ; number disk heads
+label disk_id byte at $$ + 3
 
-; Вывод строки DS:SI на экран
+boot_msg db "My OS boot loader. Version 0.01",13,10,0
+not_implemented_msg db "Not implemented",13,10,0
+
+; write a string DS:SI to the monitor
 write_str:
 	push ax si
 	mov ah, 0x0E
@@ -45,13 +51,32 @@ write_str:
 	pop si ax
 	ret
 
+load_sector.error:
+	mov si, not_implemented_msg
+	call write_str
+	ret
+
+get_disk_parameters:
+	mov [disk_id], dl ; get bootable disk id
+	mov ah, 0x08
+	xor di, di ; ES is already zero
+	push es ; we don’t need a pointer to BIOS parameters block but we need zero ES
+	int 0x13
+	pop es
+	jc load_sector.error ; this function is not implemented for now
+	inc dh ; first heads number is 0, to get the length we need increment this one
+	mov [head_count], dh
+	and cx, 111111b ; select low 6 bits of CX
+	mov [sector_per_track], cx
+	ret
+	
 start:
  
-	cli							; Clear all Interrupts
+	cli							; clear all Interrupts
 
 	mov si, boot_msg
 	call write_str
-
+	
 	hlt							; halt the system
 	
 times 510 - ($-$$) db 0			; We have to be 512 bytes. Clear the rest of the bytes with 0
