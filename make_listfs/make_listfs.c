@@ -291,11 +291,14 @@ int main(int argc, char *argv[]) {
 		usage();
 		return 0;
 	}
-	if (!check_options()) return -1;
-	if (!open_output_file()) return -2;
+	if (!check_options()) 
+		return -1;
+	if (!open_output_file()) 
+		return -2;
 	init_listfs_header();
 	init_disk_map();
-	if (source_dir_name) fs_header->first_file = process_dir(-1, source_dir_name);
+	if (source_dir_name) 
+		fs_header->first_file = process_dir(-1, source_dir_name);
 	store_disk_map();
 	store_listfs_header();
 	close_output_file();
