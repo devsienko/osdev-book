@@ -35,6 +35,8 @@ label head_count byte at $$ + 2 ; number disk heads
 label disk_id byte at $$ + 3
 
 boot_msg db "My OS boot loader. Version 0.01",13,10,0
+reboot_msg db "Press any key...",13,10,0
+boot_file_name db "boot.bin",0
 
 ; write a string DS:SI to the monitor
 write_str:
@@ -49,6 +51,13 @@ write_str:
  @@:
 	pop si ax
 	ret
+
+reboot:
+	mov si, reboot_msg
+	call write_str
+	xor ah, ah
+	int 0x16
+	jmp 0xFFFF:0
 
 get_disk_parameters:
 	mov [disk_id], dl ; get bootable disk id
@@ -155,7 +164,7 @@ load_file_data:
  .load_sector:
 	lodsw ; load next sector
 	mov dx, [si]
-	add si, 2
+	add si, 2 ; 6 ???
 	cmp ax, -1 ; is it the end of the list?
 	jne @f
 	cmp dx, -1
@@ -163,6 +172,7 @@ load_file_data:
  @@:
 	push es
 	mov es, bx ; load next sector
+	xor di, di
 	call load_sector
 	add bx, 0x200 / 16 ; load the next sector further 512 bytes
 	pop es
@@ -171,15 +181,80 @@ load_file_data:
 	mov dx, [si]
 	jmp .load_list
 
+load_stage2:
+	; load stage 2 of the bootloader
+	mov si, boot_file_name
+	mov ax, word[fs_first_file]
+	mov dx, word[fs_first_file + 2]
+	call find_file
+	mov bx, 0x7E00 / 16
+	call load_file_data
+	; go to stage 2 of the bootloader
+	jmp stage2
 start:
  
 	cli							; clear all Interrupts
 
 	mov si, boot_msg
 	call write_str
-	
-	hlt							; halt the system
+
+	call get_disk_parameters
+	call load_stage2
+
+	;hlt							; halt the system
 	
 times 510 - ($-$$) db 0			; We have to be 512 bytes. Clear the rest of the bytes with 0
  
 dw 0xAA55						; Boot Signiture
+
+; additional bootloader data
+load_msg_preffix db "Loading '",0
+load_msg_suffix db "'...",0
+ok_msg db "OK",13,10,0
+; split string from DS:SI by ‘/’
+split_file_name:
+	push si
+ @@:
+	lodsb
+	cmp al, "/"
+	je @f
+	jmp @b
+ @@:
+	mov byte[si - 1], 0
+	mov ax, si
+	pop si
+	ret
+; load file with name DS:SI to the buffer DI:0. file size (in sectors) we return in  AX
+load_file:
+	push si
+	mov si, load_msg_preffix
+	call write_str
+	pop si
+	call write_str
+	push si
+	mov si, load_msg_suffix
+	call write_str
+	pop si
+	push si bp
+	mov dx, word[fs_first_file + 2] ; start to search with root dir
+	mov ax, word[fs_first_file]
+ @@:
+	push ax
+	call split_file_name
+	mov bp, ax
+	pop ax
+	call find_file
+	test byte[f_flags], 1 ; is it dir flag?
+	jz @f
+	mov si, bp
+	mov dx, word[f_data + 2]
+	mov ax, word[f_data]
+	jmp @b	
+ @@:
+	call load_file_data
+	mov si, ok_msg
+	call write_str
+	pop bp si
+	ret
+stage2:
+	call reboot
