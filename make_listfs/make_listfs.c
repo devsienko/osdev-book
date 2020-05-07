@@ -131,7 +131,7 @@ void write_block(uint64 index, void *data, unsigned int count) {
 }
 
 void init_listfs_header() {
-	fs_header = calloc(block_size, 1);
+	fs_header = calloc(block_size, 1); //this sector (512 bytes) of memory will contain the fs header (64 bytes) + bootloader data (the rest of space)
 	if (boot_loader_file_name) {
 		FILE *f;
 		f = fopen(boot_loader_file_name, "rb");
@@ -144,7 +144,7 @@ void init_listfs_header() {
 					fread(buffer, block_size, 1, f);
 					write_block(i, buffer, 1);
 					i++;
-					boot_loader_extra_blocks++;
+					boot_loader_extra_blocks++; //we will use it to store the disk map
 				}
 			}
 			fclose(f);
@@ -187,7 +187,8 @@ void init_disk_map() {
 	int i;
 	fs_header->map_base = /* 1 + */ boot_loader_extra_blocks;
 	fs_header->map_size = block_count / 8;
-	if (fs_header->map_size % block_size) fs_header->map_size += block_size;
+	if (fs_header->map_size % block_size)
+		fs_header->map_size += block_size;
 	fs_header->map_size /= block_size;
 	disk_map = calloc(block_size, fs_header->map_size);
 	for (i = 0; i < fs_header->map_base + fs_header->map_size; i++) {
@@ -201,7 +202,8 @@ void store_disk_map() {
 }
 
 uint64 store_file_data(FILE *file) {
-	if (feof(file)) return -1;
+	if (feof(file)) 
+		return -1;
 	uint64 *block_list = malloc(block_size);
 	uint64 block_list_index = alloc_disk_block();
 	char *block_data = malloc(block_size);
@@ -242,7 +244,8 @@ uint64 process_dir(uint64 parent, char *dir_name) {
 	}
 	file_header = malloc(block_size);
 	while (entry = readdir(dir)) {
-		if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")) continue;
+		if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")) 
+			continue;
 		cur_file = alloc_disk_block();
 		if (prev_file != -1) {
 			file_header->next = cur_file;
