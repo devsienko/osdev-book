@@ -298,6 +298,9 @@ gdtr_data:
 	dd dt_data
 
 use32
+
+include 'stdio.inc'
+
 start32:
 	; prepare segment registers
 	mov eax, 16
@@ -307,7 +310,11 @@ start32:
 	mov gs, ax
 	mov ss, ax
 	movzx esp, sp
-	; show '!' to display (in the right bottom cornet)
-	mov byte[0xB8000 + (25 * 80 - 1) * 2], "!"
 	
+	call		ClsScr
+	mov	ebx, msg
+	call Puts
+
 	hlt
+
+msg db  10, 10, 10, "                     <OS Development Series Tutorial>", 0
