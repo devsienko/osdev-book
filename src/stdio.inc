@@ -1,3 +1,5 @@
+use32
+
 define		VIDMEM	0xB8000			; video memory
 define		COLS	80				; width and height of screen
 define		LINES	25
@@ -10,7 +12,7 @@ _CurY db 0
 ;	BL - Character to print
 Putch:
 	pusha				; save registers
-	mov	edi, VIDMEM		; get pointer to video memory
+	mov edi, VIDMEM		; get pointer to video memory
 
 	; 	Get current position
 	xor	eax, eax
@@ -76,7 +78,7 @@ Puts:
 
 	call Putch				; Print the character
 
-	inc	edi					; go to next character
+	inc edi					; go to next character
 	jmp	.loop
 
 .done:
