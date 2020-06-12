@@ -1,9 +1,9 @@
 if not exist "bin\" mkdir bin
 mkdir bin\disk
 
-del bin\* /Q
+del bin\* /S /Q
 
-fasm src\boot.asm bin\boot.bios.bin
+fasm src\boot\boot.asm bin\boot.bios.bin
 
 tools\dd if=bin\boot.bios.bin of=bin\boot_sector.bin bs=512 count=1
 tools\dd if=bin\boot.bios.bin of=bin\disk\boot.bin bs=1 skip=512
