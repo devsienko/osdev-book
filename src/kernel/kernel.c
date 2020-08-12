@@ -48,15 +48,12 @@ void display_memory_map(void *memory_map) {
 		if(is_last_memory_map_entry(entry))
 			break;
 		
-		printf("region %d: start - 0x%x; ", 
+		printf("region %d: start - %u; length (bytes) - %u; type - %d (%s)\n", 
 			region_number, 
-			entry->base);
-		printf("length (bytes) - 0x%x; ", 
-			entry->length);
-		printf("type - %d (%s)\n", 
+			(unsigned long)entry->base,
+			(unsigned long)entry->length,
 			entry->type,
 			memory_types[entry->type-1]);
-
 		entry++;
 		region_number++;
 	}
