@@ -2,12 +2,7 @@
 #include "stdlib.h"
 #include "interrupts.h"
 
-typedef struct {
-	uint64 base;
-	uint64 size;
-} BootModuleInfo;
-
-void kernel_main(uint8 boot_disk_id, void *memory_map, BootModuleInfo *boot_module_list) {
+void kernel_main(uint8 boot_disk_id, void *memory_map) {
 	init_interrupts();
 	init_tty();
 	set_text_attr(63);
@@ -16,10 +11,7 @@ void kernel_main(uint8 boot_disk_id, void *memory_map, BootModuleInfo *boot_modu
 	printf("Welcome to SUN OS!\n\n");
 
 	printf("Boot disk id ------- %d\n", boot_disk_id);
-	printf("Memory map --------- 0x%x\n", memory_map);
-	printf("Boot module list --- 0x%x (undefined yet)\n\n", boot_module_list);
-
-	printf("String is %s, char is %c, number is %d, hex number is 0x%x\n\n", __DATE__, 'A', 1234, 0x1234);
+	printf("Memory map --------- 0x%x\n\n", memory_map);
 
 	display_memory_map(memory_map);
 
