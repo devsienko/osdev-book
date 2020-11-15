@@ -21,6 +21,13 @@ void kernel_main(uint8 boot_disk_id, void *memory_map) {
 	printf("memory_size = %d MB\n", memory_size / 1024 / 1024);
 	printf("get_page_info(kernel_page_dir, 0xB8000) = 0x%x\n\n", get_page_info(kernel_page_dir, (void*)0xB8000));
 
+	int i;
+	for (i = 0; i < kernel_address_space.block_count; i++) {
+		printf("type = %d, base = 0x%x, length = 0x%x\n", kernel_address_space.blocks[i].type, kernel_address_space.blocks[i].base,
+			kernel_address_space.blocks[i].length);
+	}
+	printf("\n");
+
 	while (true) {
 		char buffer[256];
 		out_string("Command>");
