@@ -70,3 +70,15 @@ int strcmp(char *str1, char *str2) {
 char *strchr(char *str, char value) {
 	return memchr(str, value, strlen(str));
 }
+
+bool mutex_get(Mutex *mutex, bool wait) {
+	bool old_value = true;
+	do {
+		asm("xchg (,%1,), %0":"=a"(old_value):"b"(mutex),"a"(old_value));
+	} while (old_value && wait);
+	return !old_value;
+}
+
+void mutex_release(Mutex *mutex) {
+	*mutex = false;
+}

@@ -26,6 +26,11 @@ typedef signed long long int64;
 	typedef uint32 size_t;
 #endif
 
+typedef bool Mutex;
+
+bool mutex_get(Mutex *mutex, bool wait);
+void mutex_release(Mutex *mutex);
+
 #define min(a, b) (((a) > (b)) ? (b) : (a))
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 
