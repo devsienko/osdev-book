@@ -3,6 +3,7 @@
 #include "memory_manager.h"
 #include "tty.h"
 #include "interrupts.h"
+#include "multitasking.h"
 #include "scancodes.h"
 
 typedef struct {
@@ -198,6 +199,9 @@ char in_char(bool wait) {
 			chr = scancodes_shifted[chr];
 		} else {
 			chr = scancodes[chr];
+		}
+		if ((!chr) && wait) {
+			asm("hlt");
 		}
 	} while (wait && (!chr));
 	return chr;

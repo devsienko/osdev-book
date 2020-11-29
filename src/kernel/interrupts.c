@@ -34,7 +34,7 @@ void init_interrupts() {
 	outportb(0xA1, irq_base + 8);
 	outportb(0xA1, 2);
 	outportb(0xA1, 1);
-	set_int_handler(irq_base, timer_int_handler, 0x8E);
+	//set_int_handler(irq_base, timer_int_handler, 0x8E);
 	asm("sti");
 }
 
@@ -48,6 +48,6 @@ void set_int_handler(uint8 index, void *handler, uint8 type) {
 	asm("popf"); 
 }
 
-IRQ_HANDLER(timer_int_handler) {
-	(*((char*)(0xB8000 + 79 * 2)))++;
-}
+// IRQ_HANDLER(timer_int_handler) {
+// 	(*((char*)(0xB8000 + 79 * 2)))++;
+// }
