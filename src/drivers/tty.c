@@ -33,7 +33,7 @@ void init_tty() {
 	// cursor = (*((uint8*)0x451)) * tty_width + (*((uint8*)0x450));
     cursor = 0;
 	text_attr = 7;
-	set_int_handler(irq_base + 1, keyboard_int_handler, 0x8E);
+	// set_int_handler(irq_base + 1, keyboard_int_handler, 0x8E);
 }
 
 void out_char(char chr) {
@@ -149,7 +149,21 @@ void printf(char *fmt, ...) {
 	va_end(args);
 }
 
-IRQ_HANDLER(keyboard_int_handler) {
+// IRQ_HANDLER(keyboard_int_handler) {
+// 	uint8 key_code;
+// 	inportb(0x60, key_code);
+// 	if (key_buffer_tail >= KEY_BUFFER_SIZE) {
+// 		key_buffer_tail = 0;
+// 	}
+// 	key_buffer_tail++;
+// 	key_buffer[key_buffer_tail - 1] = key_code;
+// 	uint8 status;
+// 	inportb(0x61, status);
+// 	status |= 1;
+// 	outportb(0x61, status);
+// } 
+
+void keyboard_interrupt() {
 	uint8 key_code;
 	inportb(0x60, key_code);
 	if (key_buffer_tail >= KEY_BUFFER_SIZE) {
@@ -161,7 +175,7 @@ IRQ_HANDLER(keyboard_int_handler) {
 	inportb(0x61, status);
 	status |= 1;
 	outportb(0x61, status);
-} 
+}
 
 uint8 in_scancode() {
 	uint8 result;
@@ -200,9 +214,9 @@ char in_char(bool wait) {
 		} else {
 			chr = scancodes[chr];
 		}
-		if ((!chr) && wait) {
-			asm("hlt");
-		}
+		// if ((!chr) && wait) {
+		// 	asm("hlt");
+		// }
 	} while (wait && (!chr));
 	return chr;
 } 

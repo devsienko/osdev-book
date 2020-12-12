@@ -1,6 +1,11 @@
 #include "stdlib.h"
 #include "memory_manager.h"
 #include "interrupts.h"
+#include "multitasking.h"
+#include "tty.h"
+
+void (*irq_handlers[])();
+void irq_handler(uint32 index, Registers *regs);
 
 typedef struct {
 	uint16 address_0_15;
@@ -35,6 +40,10 @@ void init_interrupts() {
 	outportb(0xA1, 2);
 	outportb(0xA1, 1);
 	//set_int_handler(irq_base, timer_int_handler, 0x8E);
+	int i;
+	for (i = 0; i < 16; i++) {
+		set_int_handler(irq_base + i, irq_handlers[i], 0x8E);
+	}
 	asm("sti");
 }
 
@@ -51,3 +60,14 @@ void set_int_handler(uint8 index, void *handler, uint8 type) {
 // IRQ_HANDLER(timer_int_handler) {
 // 	(*((char*)(0xB8000 + 79 * 2)))++;
 // }
+
+void irq_handler(uint32 index, Registers *regs) {
+	switch (index) {
+		case 0:
+			switch_task(regs);
+			break;
+		case 1:
+			keyboard_interrupt();
+			break;
+	}
+}

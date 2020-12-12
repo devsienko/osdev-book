@@ -2,6 +2,7 @@
 #define MULTITASKING_H
 
 #include "stdlib.h"
+#include "interrupts.h"
 
 typedef struct {
 	ListItem list_item;
@@ -18,6 +19,7 @@ typedef struct {
 	void *stack_base;
 	size_t stack_size;
 	void *stack_pointer;
+	Registers state;
 } Thread;
 
 List process_list;
@@ -30,7 +32,7 @@ Process *kernel_process;
 Thread *kernel_thread;
 
 void init_multitasking();
-void switch_task();
+void switch_task(Registers *regs);
 
 Thread *create_thread(Process *process, void *entry_point, size_t stack_size, bool kernel, bool suspend);
 

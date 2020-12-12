@@ -371,6 +371,9 @@ dt_data:
 	db 11001111b 		; granularity
 	db 0				; base high
 
+; TSS:
+	dq 0x7F4089FFD0002FFF
+
 gdtr_data:
 	dw $ - dt_data - 1
 	dd dt_data
