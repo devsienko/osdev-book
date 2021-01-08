@@ -68,6 +68,10 @@ void strncpy(char *dest, char*src, size_t max_count);
 int strcmp(char *str1, char *str2);
 char *strchr(char *str, char value);
 
+int atoi(const char *s);
+int isspace(int c);
+int isdigit(int c);
+
 struct memory_map_entry{
         unsigned long long base;
         unsigned long long length;
@@ -78,5 +82,4 @@ struct memory_map_entry{
 void list_init(List *list);
 void list_append(List *list, ListItem *item);
 void list_remove(ListItem *item);
-
 #endif 

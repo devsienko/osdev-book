@@ -3,12 +3,15 @@
 #include "memory_manager.h"
 #include "interrupts.h"
 #include "multitasking.h"
+#include "floppy.h"
+#include "timer.h"
 
 void kernel_main(uint8 boot_disk_id, void *memory_map) {
 	init_memory_manager(memory_map);
 	init_interrupts();
 	init_multitasking();
 	init_tty();
+	init_floppy();
 	set_text_attr(63);
 	clear_screen();
 
@@ -35,9 +38,26 @@ void kernel_main(uint8 boot_disk_id, void *memory_map) {
 		out_string("Command>");
 		in_string(buffer, sizeof(buffer));
 		if(!strcmp("runp", buffer))
-			runp();
-		printf("You typed: %s\n", buffer);
+			run_p();
+		else if(!strcmp("showp", buffer))
+			show_p();
+		else if(!strcmp("load_file", buffer))
+			load_file();
+		else if(!strcmp("read", buffer))
+			cmd_read_sect();
+		else if(!strcmp("ticks", buffer))
+			cmd_get_ticks();
+		else 
+			printf("You typed: %s\n", buffer);
 	}
+}
+
+void init_floppy () { 
+	// set drive 0 as current drive
+	flpydsk_set_working_drive(0);
+
+	// install floppy disk to IR 38, uses IRQ 6
+	flpydsk_install(38);
 }
 
 bool is_last_memory_map_entry(struct memory_map_entry *entry);
@@ -78,7 +98,24 @@ bool is_last_memory_map_entry(struct memory_map_entry *entry) {
 	return result;
 }
 
-void runp() {
+void show_p() {
+	for(int i = 0; i < process_list.count; i++) {
+		char* process_name = (*((Process*)process_list.first)).name;
+		printf("  process - %s\n", process_name);
+	}
+}
+
+void load_file() {
+	char *file_name = "file_name: first.bin\n";
+	load_sector();
+	printf(file_name);
+}
+
+void load_sector() {
+	const int sector_per_track = 18;
+}
+
+void run_p() {
 	char* video_mem = 0xB8000;
 	int rows = 25;
 	int columns = 80;
@@ -89,4 +126,42 @@ void runp() {
 			*(video_mem + offset * 2) = initChar++;
 		}
 	}
+}
+
+void cmd_get_ticks() { 
+	printf("\nticks: %d\n", get_tick_count());
+}
+
+void cmd_read_sect() {
+	uint32 sectornum = 0;
+	char sectornumbuf [4];
+	uint8* sector = 0;
+
+	printf ("\nPlease type in the sector number [0 is default] > ");
+	in_string(sectornumbuf, sizeof(sectornumbuf));
+	sectornum = atoi(sectornumbuf);
+
+	printf("\nSector %d contents:\n\n", sectornum);
+
+	// read sector from disk
+	sector = flpydsk_read_sector(sectornum);
+
+	// display sector
+	if (sector != 0) {
+		int i = 0;
+		printf("\n*** Error reading sector from disk");
+		// for (int c = 0; c < 4; c++) {
+		// 	for (int j = 0; j < 128; j++)
+		// 		printf("0x%x ", sector[i + j]);
+		// 	i += 128;
+		// 	printf("\nPress any key to continue...\n");
+			
+		// 	char buffer[1];
+		// 	in_string(buffer, sizeof(buffer));
+		// }
+	}
+	else
+		printf("\n*** Error reading sector from disk");
+
+	printf("Done.\n");
 }

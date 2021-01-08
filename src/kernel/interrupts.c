@@ -3,6 +3,8 @@
 #include "interrupts.h"
 #include "multitasking.h"
 #include "tty.h"
+#include "timer.h"
+#include "floppy.h"
 
 void (*irq_handlers[])();
 void irq_handler(uint32 index, Registers *regs);
@@ -64,10 +66,15 @@ void set_int_handler(uint8 index, void *handler, uint8 type) {
 void irq_handler(uint32 index, Registers *regs) {
 	switch (index) {
 		case 0:
+			inc_pit_ticks();
 			switch_task(regs);
 			break;
 		case 1:
 			keyboard_interrupt();
 			break;
+		case 6: 
+			flpydsk_irq();
+			break;
+
 	}
 }
