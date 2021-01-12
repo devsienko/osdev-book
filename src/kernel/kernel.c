@@ -53,11 +53,14 @@ void kernel_main(uint8 boot_disk_id, void *memory_map) {
 }
 
 void init_floppy () { 
-	// set drive 0 as current drive
-	flpydsk_set_working_drive(0);
+	//! set drive 0 as current drive
+	flpydsk_set_working_drive (0);
 
-	// install floppy disk to IR 38, uses IRQ 6
-	flpydsk_install(38);
+	//! install floppy disk to IR 38, uses IRQ 6
+	flpydsk_install (38);
+
+	//! set DMA buffer to 64k
+	flpydsk_set_dma (0x8000);
 }
 
 bool is_last_memory_map_entry(struct memory_map_entry *entry);
@@ -149,16 +152,15 @@ void cmd_read_sect() {
 	// display sector
 	if (sector != 0) {
 		int i = 0;
-		printf("\n*** Error reading sector from disk");
-		// for (int c = 0; c < 4; c++) {
-		// 	for (int j = 0; j < 128; j++)
-		// 		printf("0x%x ", sector[i + j]);
-		// 	i += 128;
-		// 	printf("\nPress any key to continue...\n");
+		for (int c = 0; c < 4; c++) {
+			for (int j = 0; j < 128; j++)
+				printf("0x%x ", sector[i + j]);
+			i += 128;
+			printf("\nPress any key to continue...\n");
 			
-		// 	char buffer[1];
-		// 	in_string(buffer, sizeof(buffer));
-		// }
+			char buffer[1];
+			in_string(buffer, sizeof(buffer));
+		}
 	}
 	else
 		printf("\n*** Error reading sector from disk");

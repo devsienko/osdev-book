@@ -1,8 +1,8 @@
-#include "floppy.h"
-#include "timer.h"
+#include <stdlib.h>
+#include <floppy.h>
 
 /*
-**	Controller I/O Ports. Please see chapter for additional ports
+**	Controller I/O Ports.
 */
 enum FLPYDSK_IO {
 	FLPYDSK_DOR		=	0x3f2,
@@ -12,7 +12,7 @@ enum FLPYDSK_IO {
 };
 
 /**
-*	Bits 0-4 of command byte. Please see chapter for additional commands
+*	Bits 0-4 of command byte.
 */
 enum FLPYDSK_CMD {
 	FDC_CMD_READ_TRACK	=	2,
@@ -116,61 +116,67 @@ const int FLOPPY_IRQ = 6;
 const int FLPY_SECTORS_PER_TRACK = 18;
 
 // dma tranfer buffer starts here and ends at 0x1000+64k
-// You can change this as needed. It must be below 16MB and in idenitity mapped memory!
-const int DMA_BUFFER = 0x1000;
+// You can change this as needed. It must be below 16MB and in identity mapped memory!
+int DMA_BUFFER = 0x1000;
 
-// current working drive. Defaults to 0 which should be fine on most systems
-static uint8	_CurrentDrive = 0;
+// FDC uses DMA channel 2
+const int FDC_DMA_CHANNEL = 2;
+
+// used to wait in miliseconds
+extern void sleep (int);
+
+//  current working drive. Defaults to 0 which should be fine on most systems
+static uint8 _CurrentDrive = 0;
 
 // set when IRQ fires
 static volatile uint8 _FloppyDiskIRQ = 0;
 
-/**
-*	DMA Routines.
-**	The DMA (Direct Memory Access) controller allows the FDC to send data to the DMA,
-**	which can put the data in memory. While the FDC can be programmed to not use DMA,
-**  it is not very well supported on emulators or virtual machines. Because of this, we
-**  will be using the DMA for data transfers. The DMA is a complex controller, because of
-**  this we will cover it in the next tutorial. For now, please do not worry about the DMA
-**  routines to much :)
-*/
+bool dma_initialize_floppy(uint8* buffer, unsigned length){
+   union{
+      uint8 byte[4];//Lo[0], Mid[1], Hi[2]
+      unsigned long l;
+   }a, c;
 
-// initialize DMA to use phys addr 84k-128k
-void flpydsk_initialize_dma () {
-	outportb (0x0a,0x06);	//mask dma channel 2
-	outportb (0xd8,0xff);	//reset master flip-flop
-	outportb (0x04, 0);     //address=0x1000 
-	outportb (0x04, 0x10);
-	outportb (0xd8, 0xff);  //reset master flip-flop
-	outportb (0x05, 0xff);  //count to 0x23ff (number of bytes in a 3.5" floppy disk track)
-	outportb (0x05, 0x23);
-	outportb (0x80, 0);     //external page register = 0
-	outportb (0x0a, 0x02);  //unmask dma channel 2
+   a.l=(unsigned)buffer;
+   c.l=(unsigned)length-1;
+
+   //Check for buffer issues
+   if ((a.l >> 24) || (c.l >> 16) || (((a.l & 0xffff)+c.l) >> 16)){
+// #ifdef _DEBUG //todo
+//       _asm{
+//          mov      eax, 0x1337
+//          cli
+//          hlt
+//       }
+// #endif
+      return false;
+   }
+
+   dma_reset (1);
+   dma_mask_channel( FDC_DMA_CHANNEL );//Mask channel 2
+   dma_reset_flipflop ( 1 );//Flipflop reset on DMA 1
+
+   dma_set_address( FDC_DMA_CHANNEL, a.byte[0],a.byte[1]);//Buffer address
+   dma_reset_flipflop( 1 );//Flipflop reset on DMA 1
+
+   dma_set_count( FDC_DMA_CHANNEL, c.byte[0],c.byte[1]);//Set count
+   dma_set_read ( FDC_DMA_CHANNEL );
+
+   dma_unmask_all( 1 );//Unmask channel 2
+
+   return true;
 }
 
-// prepare the DMA for read transfer
-void flpydsk_dma_read () {
-	outportb (0x0a, 0x06); //mask dma channel 2
-	outportb (0x0b, 0x56); //single transfer, address increment, autoinit, read, channel 2
-	outportb (0x0a, 0x02); //unmask dma channel 2
+// sets DMA base address
+void flpydsk_set_dma (int addr) {
+	DMA_BUFFER = addr;
 }
-
-// prepare the DMA for write transfer
-void flpydsk_dma_write () {
-	outportb (0x0a, 0x06); //mask dma channel 2
-	outportb (0x0b, 0x5a); //single transfer, address increment, autoinit, write, channel 2
-	outportb (0x0a, 0x02); //unmask dma channel 2
-}
-
-/**
-*	Basic Controller I/O Routines
-*/
 
 // return fdc status
 uint8 flpydsk_read_status () {
-	// just return main status register
-    uint8 result;
+	uint8 result;
 	inportb(FLPYDSK_MSR, result);
+	// just return main status register
 	return result;
 }
 
@@ -181,65 +187,57 @@ void flpydsk_write_dor (uint8 val) {
 }
 
 // send command byte to fdc
-void flpydsk_send_command(uint8 cmd) {
+void flpydsk_send_command (uint8 cmd) {
 	// wait until data register is ready. We send commands to the data register
 	for (int i = 0; i < 500; i++ )
-		if (flpydsk_read_status() & FLPYDSK_MSR_MASK_DATAREG) {
+		if ( flpydsk_read_status () & FLPYDSK_MSR_MASK_DATAREG ) {
 			outportb (FLPYDSK_FIFO, cmd);
-            break;
-        }
+			return;
+		}	
 }
 
 // get data from fdc
 uint8 flpydsk_read_data () {
 	// same as above function but returns data register for reading
 	for (int i = 0; i < 500; i++ )
-		if (flpydsk_read_status () & FLPYDSK_MSR_MASK_DATAREG) {
-            uint8 result;
-            inportb(FLPYDSK_FIFO, result);
+		if (flpydsk_read_status () & FLPYDSK_MSR_MASK_DATAREG ) {
+			uint8 result;
+			inportb(FLPYDSK_FIFO, result);
 			return result;
-        }
+		}
+
 	return 0;
 }
 
 // write to the configuation control register
 void flpydsk_write_ccr (uint8 val) {
-	// write the configuation control
-	outportb (FLPYDSK_CTRL, val);
+	// write the configuration control
+	outportb(FLPYDSK_CTRL, val);
 }
-
-/**
-*	Interrupt Handling Routines
-*/
 
 // wait for irq to fire
 void flpydsk_wait_irq () {
 	// wait for irq to fire
-	while ( _FloppyDiskIRQ == 0)
+	while (_FloppyDiskIRQ == 0)
 		;
 	_FloppyDiskIRQ = 0;
 }
 
-
 // floppy disk irq handler
-void flpydsk_irq () {
+void i86_flpy_irq() {
 	_FloppyDiskIRQ = 1;
 }
 
-/**
-*	Controller Command Routines
-*/
-
 // check interrupt status command
-void flpydsk_check_int (uint32* st0, uint32* cyl) {
-	flpydsk_send_command(FDC_CMD_CHECK_INT);
+void flpydsk_check_int(uint32* st0, uint32* cyl) {
+	flpydsk_send_command (FDC_CMD_CHECK_INT);
 
-	*st0 = flpydsk_read_data ();
-	*cyl = flpydsk_read_data ();
+	*st0 = flpydsk_read_data();
+	*cyl = flpydsk_read_data();
 }
 
 // turns the current floppy drives motor on/off
-void flpydsk_control_motor (bool b) {
+void flpydsk_control_motor(bool b) {
 	// sanity check: invalid drive
 	if (_CurrentDrive > 3)
 		return;
@@ -264,40 +262,42 @@ void flpydsk_control_motor (bool b) {
 
 	// turn on or off the motor of that drive
 	if (b)
-		flpydsk_write_dor ((uint8)(_CurrentDrive | motor | FLPYDSK_DOR_MASK_RESET | FLPYDSK_DOR_MASK_DMA));
+		flpydsk_write_dor((uint8)(_CurrentDrive | motor | FLPYDSK_DOR_MASK_RESET | FLPYDSK_DOR_MASK_DMA));
 	else
-		flpydsk_write_dor (FLPYDSK_DOR_MASK_RESET);
+		flpydsk_write_dor(FLPYDSK_DOR_MASK_RESET);
 
 	// in all cases; wait a little bit for the motor to spin up/turn off
 	sleep(20);
 }
 
 // configure drive
-void flpydsk_drive_data (uint8 stepr, uint8 loadt, uint8 unloadt, bool dma ) {
+void flpydsk_drive_data (uint8 stepr, uint8 loadt, uint8 unloadt, bool dma) {
 	uint8 data = 0;
 
 	// send command
 	flpydsk_send_command(FDC_CMD_SPECIFY);
 	data = ((stepr & 0xf) << 4) | (unloadt & 0xf);
 		flpydsk_send_command(data);
-	data = (loadt) << 1 | (dma == false) ? 0 : 1;
+	data = ((loadt << 1) | ((dma) ? 0 : 1));
 		flpydsk_send_command(data);
 }
 
 // calibrates the drive
-int flpydsk_calibrate (uint8 drive) {
+int flpydsk_calibrate(uint8 drive) {
 	uint32 st0, cyl;
+
 	if (drive >= 4)
 		return -2;
 
 	// turn on the motor
-	flpydsk_control_motor (true);
+	flpydsk_control_motor(true);
+
 	for (int i = 0; i < 10; i++) {
 		// send command
 		flpydsk_send_command(FDC_CMD_CALIBRATE);
 		flpydsk_send_command(drive);
 		flpydsk_wait_irq();
-		flpydsk_check_int(&st0, &cyl);
+		flpydsk_check_int( &st0, &cyl);
 
 		// did we fine cylinder 0? if so, we are done
 		if (!cyl) {
@@ -306,7 +306,7 @@ int flpydsk_calibrate (uint8 drive) {
 		}
 	}
 
-	flpydsk_control_motor (false);
+	flpydsk_control_motor(false);
 	return -1;
 }
 
@@ -317,48 +317,51 @@ void flpydsk_disable_controller () {
 
 // enable controller
 void flpydsk_enable_controller () {
-	flpydsk_write_dor (FLPYDSK_DOR_MASK_RESET | FLPYDSK_DOR_MASK_DMA);
+	flpydsk_write_dor(FLPYDSK_DOR_MASK_RESET | FLPYDSK_DOR_MASK_DMA);
 }
 
 // reset controller
-void flpydsk_reset () {
+void flpydsk_reset (){
 	uint32 st0, cyl;
 
 	// reset the controller
-	flpydsk_disable_controller ();
-	flpydsk_enable_controller ();
-	flpydsk_wait_irq ();
+	flpydsk_disable_controller();
+	flpydsk_enable_controller();
+	flpydsk_wait_irq();
 
 	// send CHECK_INT/SENSE INTERRUPT command to all drives
 	for (int i = 0; i < 4; i++)
-		flpydsk_check_int(&st0, &cyl);
+		flpydsk_check_int (&st0,&cyl);
 
 	// transfer speed 500kb/s
 	flpydsk_write_ccr(0);
 
 	// pass mechanical drive info. steprate=3ms, unload time=240ms, load time=16ms
-	flpydsk_drive_data(3,16,240,true);
+	flpydsk_drive_data (3,16,240,true);
 
 	// calibrate the disk
-	flpydsk_calibrate(_CurrentDrive);
+	flpydsk_calibrate ( _CurrentDrive );
 }
 
 // read a sector
-void flpydsk_read_sector_imp (uint8 head, uint8 track, uint8 sector) {
+void flpydsk_read_sector_imp(uint8 head, uint8 track, uint8 sector) {
 	uint32 st0, cyl;
 
+	// initialize DMA
+	dma_initialize_floppy((uint8*) DMA_BUFFER, 512);
+
 	// set the DMA for read transfer
-	flpydsk_dma_read();
+	dma_set_read(FDC_DMA_CHANNEL);
 
 	// read in a sector
-	flpydsk_send_command(
+	flpydsk_send_command (
 				FDC_CMD_READ_SECT | FDC_CMD_EXT_MULTITRACK | FDC_CMD_EXT_SKIP | FDC_CMD_EXT_DENSITY);
 	flpydsk_send_command(head << 2 | _CurrentDrive);
 	flpydsk_send_command(track);
 	flpydsk_send_command(head);
 	flpydsk_send_command(sector);
-	flpydsk_send_command(FLPYDSK_SECTOR_DTL_512 );
-	flpydsk_send_command(((sector + 1 ) >= FLPY_SECTORS_PER_TRACK ) ? FLPY_SECTORS_PER_TRACK : sector + 1 );
+	flpydsk_send_command(FLPYDSK_SECTOR_DTL_512);
+	flpydsk_send_command(((sector + 1) >= FLPY_SECTORS_PER_TRACK ) ? FLPY_SECTORS_PER_TRACK : sector + 1);
 	flpydsk_send_command(FLPYDSK_GAP3_LENGTH_3_5);
 	flpydsk_send_command(0xff);
 
@@ -366,15 +369,15 @@ void flpydsk_read_sector_imp (uint8 head, uint8 track, uint8 sector) {
 	flpydsk_wait_irq ();
 
 	// read status info
-	for (int j=0; j<7; j++)
-		flpydsk_read_data ();
+	for (int j = 0; j < 7; j++)
+		flpydsk_read_data();
 
 	// let FDC know we handled interrupt
-	flpydsk_check_int(&st0,&cyl);
+	flpydsk_check_int (&st0,&cyl);
 }
 
 // seek to given track/cylinder
-int flpydsk_seek (uint8 cyl, uint8 head) {
+int flpydsk_seek(uint8 cyl, uint8 head) {
 	uint32 st0, cyl0;
 
 	if (_CurrentDrive >= 4)
@@ -383,15 +386,15 @@ int flpydsk_seek (uint8 cyl, uint8 head) {
 	for (int i = 0; i < 10; i++ ) {
 		// send the command
 		flpydsk_send_command (FDC_CMD_SEEK);
-		flpydsk_send_command ((head) << 2 | _CurrentDrive);
+		flpydsk_send_command ( (head) << 2 | _CurrentDrive);
 		flpydsk_send_command (cyl);
 
 		// wait for the results phase IRQ
 		flpydsk_wait_irq ();
-		flpydsk_check_int(&st0,&cyl0);
+		flpydsk_check_int (&st0,&cyl0);
 
 		// found the cylinder?
-		if (cyl0 == cyl)
+		if ( cyl0 == cyl)
 			return 0;
 	}
 
@@ -399,7 +402,7 @@ int flpydsk_seek (uint8 cyl, uint8 head) {
 }
 
 // convert LBA to CHS
-void flpydsk_lba_to_chs (int lba, int *head, int *track, int *sector) {
+void flpydsk_lba_to_chs (int lba,int *head,int *track,int *sector) {
    *head = ( lba % ( FLPY_SECTORS_PER_TRACK * 2 ) ) / ( FLPY_SECTORS_PER_TRACK );
    *track = lba / ( FLPY_SECTORS_PER_TRACK * 2 );
    *sector = lba % FLPY_SECTORS_PER_TRACK + 1;
@@ -407,14 +410,11 @@ void flpydsk_lba_to_chs (int lba, int *head, int *track, int *sector) {
 
 // install floppy driver
 void flpydsk_install (int irq) {
-	// initialize the DMA for FDC
-	flpydsk_initialize_dma();
-
 	// reset the fdc
-	flpydsk_reset();
+	flpydsk_reset ();
 
 	// set drive information
-	flpydsk_drive_data(13, 1, 0xf, true); //todo
+	flpydsk_drive_data (13, 1, 0xf, true);
 }
 
 // set current working drive
@@ -425,7 +425,6 @@ void flpydsk_set_working_drive (uint8 drive) {
 
 // get current working drive
 uint8 flpydsk_get_working_drive () {
-
 	return _CurrentDrive;
 }
 
@@ -436,7 +435,7 @@ uint8* flpydsk_read_sector (int sectorLBA) {
 
 	// convert LBA sector to CHS
 	int head = 0, track = 0, sector = 1;
-	flpydsk_lba_to_chs (sectorLBA, &head, &track, &sector);
+	flpydsk_lba_to_chs(sectorLBA, &head, &track, &sector);
 
 	// turn motor on and seek to track
 	flpydsk_control_motor(true);

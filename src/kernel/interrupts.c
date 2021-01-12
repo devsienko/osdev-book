@@ -73,7 +73,7 @@ void irq_handler(uint32 index, Registers *regs) {
 			keyboard_interrupt();
 			break;
 		case 6: 
-			flpydsk_irq();
+			i86_flpy_irq();
 			break;
 
 	}
