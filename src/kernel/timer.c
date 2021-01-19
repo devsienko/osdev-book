@@ -19,6 +19,8 @@ void inc_pit_ticks() {
 
 // returns current tick count
 uint32 get_tick_count () {
+	//todo: check static _pit_ticks
+	//http://www.brokenthorn.com/forums/viewtopic.php?f=15&t=253&p=923&hilit=dma#p923
 	return _pit_ticks;
 }
 
@@ -70,7 +72,6 @@ void i86_pit_start_counter (uint32 freq, uint8 counter, uint8 mode) {
 
 // sleeps a little bit
 void sleep(int ms) {
-
 	int ticks = ms + get_tick_count();
 	while (ticks > get_tick_count())
 		;

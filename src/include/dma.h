@@ -147,7 +147,7 @@ void dma_mask_channel(uint8 channel);
 void dma_unmask_channel(uint8 channel);
 
 // resets a flipflop
-void dma_reset_flipflop(int dma);
+void dma_reset_flipflop(int channel);
 
 // reset the dma to defaults
 void dma_reset(int dma);

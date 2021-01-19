@@ -123,7 +123,7 @@ int DMA_BUFFER = 0x1000;
 const int FDC_DMA_CHANNEL = 2;
 
 // used to wait in miliseconds
-extern void sleep (int);
+extern void sleep(int);
 
 //  current working drive. Defaults to 0 which should be fine on most systems
 static uint8 _CurrentDrive = 0;
@@ -132,37 +132,30 @@ static uint8 _CurrentDrive = 0;
 static volatile uint8 _FloppyDiskIRQ = 0;
 
 bool dma_initialize_floppy(uint8* buffer, unsigned length){
-   union{
-      uint8 byte[4];//Lo[0], Mid[1], Hi[2]
+   union {
+      uint8 byte[4]; //Lo[0], Mid[1], Hi[2]
       unsigned long l;
-   }a, c;
+   } a, c;
 
-   a.l=(unsigned)buffer;
-   c.l=(unsigned)length-1;
+   a.l = (unsigned) buffer;
+   c.l = (unsigned) length - 1;
 
    //Check for buffer issues
-   if ((a.l >> 24) || (c.l >> 16) || (((a.l & 0xffff)+c.l) >> 16)){
-// #ifdef _DEBUG //todo
-//       _asm{
-//          mov      eax, 0x1337
-//          cli
-//          hlt
-//       }
-// #endif
+   if ((a.l >> 24) || (c.l >> 16) || (((a.l & 0xffff) + c.l) >> 16)) {
       return false;
    }
 
-   dma_reset (1);
-   dma_mask_channel( FDC_DMA_CHANNEL );//Mask channel 2
-   dma_reset_flipflop ( 1 );//Flipflop reset on DMA 1
+   dma_reset(1);
+   dma_mask_channel(FDC_DMA_CHANNEL); //Mask channel 2
+   dma_reset_flipflop(FDC_DMA_CHANNEL); //Flipflop reset on DMA 1
 
-   dma_set_address( FDC_DMA_CHANNEL, a.byte[0],a.byte[1]);//Buffer address
-   dma_reset_flipflop( 1 );//Flipflop reset on DMA 1
+   dma_set_address(FDC_DMA_CHANNEL, a.byte[0], a.byte[1]); //Buffer address
+   dma_reset_flipflop(FDC_DMA_CHANNEL); //Flipflop reset on DMA 1
 
-   dma_set_count( FDC_DMA_CHANNEL, c.byte[0],c.byte[1]);//Set count
-   dma_set_read ( FDC_DMA_CHANNEL );
+   dma_set_count(FDC_DMA_CHANNEL, c.byte[0], c.byte[1]); //Set count
+   dma_set_read(FDC_DMA_CHANNEL); //set the DMA for read transfer
 
-   dma_unmask_all( 1 );//Unmask channel 2
+   dma_unmask_all(1); //Unmask channel 2
 
    return true;
 }
@@ -230,7 +223,7 @@ void i86_flpy_irq() {
 
 // check interrupt status command
 void flpydsk_check_int(uint32* st0, uint32* cyl) {
-	flpydsk_send_command (FDC_CMD_CHECK_INT);
+	flpydsk_send_command(FDC_CMD_CHECK_INT);
 
 	*st0 = flpydsk_read_data();
 	*cyl = flpydsk_read_data();
@@ -271,15 +264,15 @@ void flpydsk_control_motor(bool b) {
 }
 
 // configure drive
-void flpydsk_drive_data (uint8 stepr, uint8 loadt, uint8 unloadt, bool dma) {
+void flpydsk_drive_data(uint8 stepr, uint8 loadt, uint8 unloadt, bool dma) {
 	uint8 data = 0;
 
 	// send command
 	flpydsk_send_command(FDC_CMD_SPECIFY);
 	data = ((stepr & 0xf) << 4) | (unloadt & 0xf);
-		flpydsk_send_command(data);
+	flpydsk_send_command(data);
 	data = ((loadt << 1) | ((dma) ? 0 : 1));
-		flpydsk_send_command(data);
+	flpydsk_send_command(data);
 }
 
 // calibrates the drive
@@ -321,7 +314,7 @@ void flpydsk_enable_controller () {
 }
 
 // reset controller
-void flpydsk_reset (){
+void flpydsk_reset() {
 	uint32 st0, cyl;
 
 	// reset the controller
@@ -331,13 +324,13 @@ void flpydsk_reset (){
 
 	// send CHECK_INT/SENSE INTERRUPT command to all drives
 	for (int i = 0; i < 4; i++)
-		flpydsk_check_int (&st0,&cyl);
+		flpydsk_check_int(&st0,&cyl);
 
 	// transfer speed 500kb/s
 	flpydsk_write_ccr(0);
 
 	// pass mechanical drive info. steprate=3ms, unload time=240ms, load time=16ms
-	flpydsk_drive_data (3,16,240,true);
+	flpydsk_drive_data(3, 16, 240, true);
 
 	// calibrate the disk
 	flpydsk_calibrate ( _CurrentDrive );
@@ -349,9 +342,6 @@ void flpydsk_read_sector_imp(uint8 head, uint8 track, uint8 sector) {
 
 	// initialize DMA
 	dma_initialize_floppy((uint8*) DMA_BUFFER, 512);
-
-	// set the DMA for read transfer
-	dma_set_read(FDC_DMA_CHANNEL);
 
 	// read in a sector
 	flpydsk_send_command (
@@ -409,7 +399,7 @@ void flpydsk_lba_to_chs (int lba,int *head,int *track,int *sector) {
 }
 
 // install floppy driver
-void flpydsk_install (int irq) {
+void flpydsk_install () {
 	// reset the fdc
 	flpydsk_reset ();
 
@@ -445,7 +435,6 @@ uint8* flpydsk_read_sector (int sectorLBA) {
 	// read sector and turn motor off
 	flpydsk_read_sector_imp((uint8)head, (uint8)track, (uint8)sector);
 	flpydsk_control_motor(false);
-
 	// warning: this is a bit hackish
 	return (uint8*) DMA_BUFFER;
 }

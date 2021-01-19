@@ -8,7 +8,7 @@
 void flpydsk_set_dma(int addr);
 
 // install floppy driver
-void flpydsk_install(int irq);
+void flpydsk_install();
 
 // set current working drive
 void flpydsk_set_working_drive(uint8 drive);

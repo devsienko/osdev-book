@@ -29,20 +29,15 @@ void dma_unmask_all (int dma){
 
 // resets controller to defaults
 void dma_reset (int dma){
-	// it doesnt matter what is written to this register
-	outportb(DMA0_TEMP_REG, 0xff);
+	outportb(DMA0_TEMP_REG, 0xff); // it doesnt matter what is written to this register
 }
 
 // resets flipflop
-void dma_reset_flipflop(int dma){
-	if (dma < 2)
-		return;
-
-	// it doesnt matter what is written to this register
-	uint16 port = (dma == 0) 
+void dma_reset_flipflop(int channel) {
+	uint16 port = channel < 4
 		? DMA0_CLEARBYTE_FLIPFLOP_REG 
 		: DMA1_CLEARBYTE_FLIPFLOP_REG;
-	outportb(port, 0xff);
+	outportb(port, 0xaa); // it doesnt matter what is written to this register
 }
 
 // sets the address of a channel
@@ -52,14 +47,14 @@ void dma_set_address(uint8 channel, uint8 low, uint8 high) {
 
 	unsigned short port = 0;
 	switch ( channel ) {
-		case 0: {port = DMA0_CHAN0_ADDR_REG; break;}
-		case 1: {port = DMA0_CHAN1_ADDR_REG; break;}
-		case 2: {port = DMA0_CHAN2_ADDR_REG; break;}
-		case 3: {port = DMA0_CHAN3_ADDR_REG; break;}
-		case 4: {port = DMA1_CHAN4_ADDR_REG; break;}
-		case 5: {port = DMA1_CHAN5_ADDR_REG; break;}
-		case 6: {port = DMA1_CHAN6_ADDR_REG; break;}
-		case 7: {port = DMA1_CHAN7_ADDR_REG; break;}
+		case 0: { port = DMA0_CHAN0_ADDR_REG; break; }
+		case 1: { port = DMA0_CHAN1_ADDR_REG; break; }
+		case 2: { port = DMA0_CHAN2_ADDR_REG; break; }
+		case 3: { port = DMA0_CHAN3_ADDR_REG; break; }
+		case 4: { port = DMA1_CHAN4_ADDR_REG; break; }
+		case 5: { port = DMA1_CHAN5_ADDR_REG; break; }
+		case 6: { port = DMA1_CHAN6_ADDR_REG; break; }
+		case 7: { port = DMA1_CHAN7_ADDR_REG; break; }
 	}
 
 	outportb(port, low);
@@ -106,7 +101,7 @@ void dma_set_mode(uint8 channel, uint8 mode) {
 
 // prepares channel for read
 void dma_set_read(uint8 channel) {
-	dma_set_mode (channel,	DMA_MODE_READ_TRANSFER | DMA_MODE_TRANSFER_SINGLE);
+	dma_set_mode(channel, DMA_MODE_READ_TRANSFER | DMA_MODE_TRANSFER_SINGLE);
 }
 
 // prepares channel for write
