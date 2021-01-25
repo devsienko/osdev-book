@@ -42,7 +42,7 @@ void dma_reset_flipflop(int channel) {
 
 // sets the address of a channel
 void dma_set_address(uint8 channel, uint8 low, uint8 high) {
-	if ( channel > 8 )
+	if (channel > 8)
 		return;
 
 	unsigned short port = 0;

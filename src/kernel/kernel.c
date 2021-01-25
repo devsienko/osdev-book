@@ -60,7 +60,7 @@ void init_floppy() {
 	flpydsk_install();
 
 	// set DMA buffer to 64k
-	flpydsk_set_dma(0x12000);
+	flpydsk_set_dma(0x12000);//todo: use physical memory manager
 }
 
 bool is_last_memory_map_entry(struct memory_map_entry *entry);
@@ -165,5 +165,4 @@ void cmd_read_sect() {
 		printf("\n*** Error reading sector from disk");
 
 	printf("Done.\n");
-	flpydsk_reset();
 }
