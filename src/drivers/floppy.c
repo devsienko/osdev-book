@@ -115,12 +115,12 @@ const int FLOPPY_IRQ = 6;
 // sectors per track
 const int FLPY_SECTORS_PER_TRACK = 18;
 
-// dma tranfer buffer starts here and ends at 0x1000+64k
 // You can change this as needed. It must be below 16MB and in identity mapped memory!
-int DMA_BUFFER = 0x1000;
+// todo: use physical memory manager
+int DMA_BUFFER = 0x12000;
 
 // FDC uses DMA channel 2
-const int FDC_DMA_CHANNEL = 2;
+const uint8 FDC_DMA_CHANNEL = 2;
 
 // used to wait in miliseconds
 extern void sleep(int);
@@ -131,7 +131,9 @@ static uint8 current_drive = 0;
 // set when IRQ fires
 static volatile bool irq_received = false;
 
-bool dma_initialize_floppy(uint8* buffer, unsigned length){
+bool dma_initialize_floppy(uint8* buffer, unsigned length) {
+	//todo: calc buffer address and extended page address register
+	
    union {
       uint8 byte[4]; //Lo[0], Mid[1], Hi[2]
       unsigned long l;
@@ -147,14 +149,17 @@ bool dma_initialize_floppy(uint8* buffer, unsigned length){
 
    dma_reset(1);
    dma_mask_channel(FDC_DMA_CHANNEL); //Mask channel 2
-   dma_reset_flipflop(FDC_DMA_CHANNEL); //Flipflop reset on DMA 1
 
-   dma_set_address(FDC_DMA_CHANNEL, a.byte[0], a.byte[1]); //Buffer address
    dma_reset_flipflop(FDC_DMA_CHANNEL); //Flipflop reset on DMA 1
-
-   dma_set_count(FDC_DMA_CHANNEL, c.byte[0], c.byte[1]); //Set count
+   
    dma_set_read(FDC_DMA_CHANNEL); //set the DMA for read transfer
 
+   dma_set_address(FDC_DMA_CHANNEL, a.byte[0], a.byte[1]); //Buffer address
+   
+   dma_set_external_page_register(2, a.byte[2]);
+  
+   dma_set_count(FDC_DMA_CHANNEL, c.byte[0], c.byte[1]); //Set count
+   
    dma_unmask_all(1); //Unmask channel 2
 
    return true;
@@ -331,7 +336,7 @@ void flpydsk_read_sector_imp(uint8 head, uint8 track, uint8 sector) {
 	uint32 st0, cyl;
 
 	// initialize DMA
-	dma_initialize_floppy((uint8*) DMA_BUFFER, 512);
+	dma_initialize_floppy((uint8*)DMA_BUFFER, 512);
 
 	// read in a sector
 	flpydsk_send_command (
@@ -354,8 +359,7 @@ void flpydsk_read_sector_imp(uint8 head, uint8 track, uint8 sector) {
 	for (int j = 0; j < 7; j++) {
 		flpydsk_read_data();
 	}
-		
-
+	
 	// let FDC know we handled interrupt
 	flpydsk_check_int(&st0,&cyl);
 }
@@ -437,7 +441,7 @@ uint8* flpydsk_read_sector (int sectorLBA) {
 	flpydsk_control_motor(false);
 
 	flpydsk_reset();//todo: remove after fix a bug after first sector reading
-
+	
 	// warning: this is a bit hackish
-	return (uint8*) DMA_BUFFER;
+	return (int8*) DMA_BUFFER;
 }

@@ -58,7 +58,7 @@ void init_floppy() {
 
 	// install floppy disk to IR 38, uses IRQ 6
 	flpydsk_install();
-
+	
 	// set DMA buffer to 64k
 	flpydsk_set_dma(0x12000);//todo: use physical memory manager
 }
@@ -138,7 +138,7 @@ void cmd_get_ticks() {
 void cmd_read_sect() {
 	uint32 sectornum = 0;
 	char sectornumbuf [4];
-	uint8* sector = 0;
+	uint8* sector;
 
 	printf ("\nPlease type in the sector number [0 is default] > ");
 	in_string(sectornumbuf, sizeof(sectornumbuf));
@@ -147,7 +147,7 @@ void cmd_read_sect() {
 	printf("\nSector %d contents:\n\n", sectornum);
 
 	// read sector from disk
-	sector = flpydsk_read_sector(sectornum);
+	sector = (uint8*)flpydsk_read_sector(sectornum);
 	// display sector
 	if (sector != 0) {
 		int i = 0;
