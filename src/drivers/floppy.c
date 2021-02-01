@@ -156,7 +156,7 @@ bool dma_initialize_floppy(uint8* buffer, unsigned length) {
 
    dma_set_address(FDC_DMA_CHANNEL, a.byte[0], a.byte[1]); //Buffer address
    
-   dma_set_external_page_register(2, a.byte[2]);
+   dma_set_external_page_register(2, a.byte[2]); // Page number
   
    dma_set_count(FDC_DMA_CHANNEL, c.byte[0], c.byte[1]); //Set count
    

@@ -47,6 +47,8 @@ void kernel_main(uint8 boot_disk_id, void *memory_map) {
 			cmd_read_sect();
 		else if(!strcmp("ticks", buffer))
 			cmd_get_ticks();
+		else if(!strcmp("exec", buffer))
+			cmd_exec();
 		else 
 			printf("You typed: %s\n", buffer);
 	}
@@ -148,6 +150,7 @@ void cmd_read_sect() {
 
 	// read sector from disk
 	sector = (uint8*)flpydsk_read_sector(sectornum);
+
 	// display sector
 	if (sector != 0) {
 		int i = 0;
@@ -165,4 +168,25 @@ void cmd_read_sect() {
 		printf("\n*** Error reading sector from disk");
 
 	printf("Done.\n");
+}
+
+
+void cmd_exec() {
+	uint32 sectornum = 0;
+	char sectornumbuf [4];
+	uint8* sector;
+
+	printf ("\nPlease type in the sector number [0 is default] > ");
+	in_string(sectornumbuf, sizeof(sectornumbuf));
+	sectornum = atoi(sectornumbuf);
+
+	printf("\nSector %d contents:\n\n", sectornum);
+
+	// read sector from disk
+	sector = (uint8*)flpydsk_read_sector(sectornum);
+
+	void *address = 0x12000;
+	goto *address;
+
+	printf("\nDone!\n\n");
 }
