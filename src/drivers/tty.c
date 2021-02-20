@@ -149,20 +149,6 @@ void printf(char *fmt, ...) {
 	va_end(args);
 }
 
-// IRQ_HANDLER(keyboard_int_handler) {
-// 	uint8 key_code;
-// 	inportb(0x60, key_code);
-// 	if (key_buffer_tail >= KEY_BUFFER_SIZE) {
-// 		key_buffer_tail = 0;
-// 	}
-// 	key_buffer_tail++;
-// 	key_buffer[key_buffer_tail - 1] = key_code;
-// 	uint8 status;
-// 	inportb(0x61, status);
-// 	status |= 1;
-// 	outportb(0x61, status);
-// } 
-
 void keyboard_interrupt() {
 	uint8 key_code;
 	inportb(0x60, key_code);

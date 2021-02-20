@@ -343,3 +343,12 @@ void init_address_space(AddressSpace *address_space, phyaddr page_dir) {
 	address_space->blocks = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE | PAGE_GLOBAL);
 	address_space->block_count = 0;
 }
+
+void init_kernel_address_space(AddressSpace *address_space, phyaddr page_dir) {
+	address_space->page_dir = page_dir;
+	address_space->start = KERNEL_MEMORY_START;
+	address_space->end = KERNEL_MEMORY_END;
+	address_space->block_table_size = PAGE_SIZE / sizeof(VirtMemoryBlock);
+	address_space->blocks = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE | PAGE_GLOBAL);
+	address_space->block_count = 0;
+}

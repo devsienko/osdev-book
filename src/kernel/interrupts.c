@@ -59,10 +59,6 @@ void set_int_handler(uint8 index, void *handler, uint8 type) {
 	asm("popf"); 
 }
 
-// IRQ_HANDLER(timer_int_handler) {
-// 	(*((char*)(0xB8000 + 79 * 2)))++;
-// }
-
 void irq_handler(uint32 index, Registers *regs) {
 	switch (index) {
 		case 0:

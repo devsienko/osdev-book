@@ -60,6 +60,20 @@ typedef struct {
 	Mutex mutex;
 } AddressSpace;
 
+#define PAGES_PER_TABLE 1024
+#define PAGES_PER_DIR	1024
+
+typedef uint32 pd_entry;
+typedef uint32 pt_entry;
+
+struct ptable {
+	pt_entry m_entries[PAGES_PER_TABLE];
+};
+
+struct pdirectory {
+	pd_entry m_entries[PAGES_PER_DIR];
+};
+
 phyaddr kernel_page_dir;
 size_t memory_size;
 AddressSpace kernel_address_space;
@@ -76,5 +90,9 @@ void free_phys_pages(phyaddr base, size_t count);
 
 void *alloc_virt_pages(AddressSpace *address_space, void *vaddr, phyaddr paddr, size_t count, unsigned int flags);
 bool free_virt_pages(AddressSpace *address_space, void *vaddr, unsigned int flags);
+
+//todo: remove it after developing:
+void init_address_space(AddressSpace *address_space, phyaddr page_dir);
+void init_kernel_address_space(AddressSpace *address_space, phyaddr page_dir);
 
 #endif

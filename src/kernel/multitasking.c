@@ -3,7 +3,7 @@
 #include "interrupts.h"
 #include "multitasking.h"
 
-TSS *tss = (void*)(USER_MEMORY_END - PAGE_SIZE * 3 + 1);
+TSS *tss = (void*)(KERNEL_MEMORY_END - PAGE_SIZE * 3 + 1);
 
 bool multitasking_enabled = false;
 
@@ -11,7 +11,7 @@ void init_multitasking() {
 	list_init(&process_list);
 	list_init(&thread_list);
 	kernel_process = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
-	init_address_space(&kernel_process->address_space, kernel_page_dir);
+	init_kernel_address_space(&kernel_process->address_space, kernel_page_dir);
 	alloc_virt_pages(&kernel_process->address_space, tss, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
 	tss->esp0 = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE | PAGE_GLOBAL);
 	tss->ss0 = 16;
@@ -30,16 +30,6 @@ void init_multitasking() {
 	asm("ltr %w0"::"a"(24));
 	multitasking_enabled = true;
 }
-
-// IRQ_HANDLER(task_switch_int_handler) {
-// 	asm("movl %%esp, %0":"=a"(current_thread->stack_pointer));
-// 	do {
-// 		current_thread = (Thread*)current_thread->list_item.next;
-// 		current_process = current_thread->process;
-// 	} while (current_thread->suspend || current_process->suspend);
-// 	asm("movl %0, %%cr3"::"a"(current_process->address_space.page_dir));
-// 	asm("movl %0, %%esp"::"a"(current_thread->stack_pointer));
-// }
 
 void switch_task(Registers *regs) {
 	if (multitasking_enabled) {
@@ -75,4 +65,4 @@ Thread *create_thread(Process *process, void *entry_point, size_t stack_size, bo
 	list_append((List*)&thread_list, (ListItem*)thread);
 	process->thread_count++;
 	return thread;
-} 
+}

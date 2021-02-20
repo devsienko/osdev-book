@@ -41,8 +41,6 @@ void kernel_main(uint8 boot_disk_id, void *memory_map) {
 			run_p();
 		else if(!strcmp("showp", buffer))
 			show_p();
-		else if(!strcmp("load_file", buffer))
-			load_file();
 		else if(!strcmp("read", buffer))
 			cmd_read_sect();
 		else if(!strcmp("ticks", buffer))
@@ -104,33 +102,26 @@ bool is_last_memory_map_entry(struct memory_map_entry *entry) {
 }
 
 void show_p() {
+	ListItem* process_item = process_list.first;
 	for(int i = 0; i < process_list.count; i++) {
-		char* process_name = (*((Process*)process_list.first)).name;
+		char* process_name = (*((Process*)process_item)).name;
 		printf("  process - %s\n", process_name);
+		process_item = process_item->next;
 	}
-}
-
-void load_file() {
-	char *file_name = "file_name: first.bin\n";
-	load_sector();
-	printf(file_name);
-}
-
-void load_sector() {
-	const int sector_per_track = 18;
 }
 
 void run_p() {
-	char* video_mem = 0xB8000;
-	int rows = 25;
-	int columns = 80;
-	char initChar = '&';
-	while (true) {
-		for(int i = 0; i < 25; i++) {
-			int offset = i * columns + 10;
-			*(video_mem + offset * 2) = initChar++;
-		}
-	}
+	// char* video_mem = 0xB8000;
+	// int rows = 25;
+	// int columns = 80;
+	// char initChar = '&';
+	// while (true) {
+	// 	for(int i = 0; i < 25; i++) {
+	// 		int offset = i * columns + 10;
+	// 		*(video_mem + offset * 2) = initChar++;
+	// 	}
+	// }
+	run_new_process();
 }
 
 void cmd_get_ticks() { 
@@ -170,8 +161,8 @@ void cmd_read_sect() {
 	printf("Done.\n");
 }
 
-
 void cmd_exec() {
+
 	uint32 sectornum = 0;
 	char sectornumbuf [4];
 	uint8* sector;
@@ -185,8 +176,81 @@ void cmd_exec() {
 	// read sector from disk
 	sector = (uint8*)flpydsk_read_sector(sectornum);
 
-	void *address = 0x12000;
-	goto *address;
+	// void *address = 0x12000;
+	// goto *address;
 
 	printf("\nDone!\n\n");
+}
+
+void init_tss (Process *new_process) {
+	phyaddr tss_area = alloc_phys_pages(1);
+	temp_map_page(tss_area);
+
+	TSS* tss_pointer = (TSS*)TEMP_PAGE;
+	tss_pointer->esp0 = alloc_virt_pages(&new_process->address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE | PAGE_GLOBAL);
+	tss_pointer->ss0 = 16;
+	tss_pointer->io_map_offset = (uint32)((uint32)tss_pointer->io_map - (uint32)tss_pointer);
+	TSS *tss = (void*)(KERNEL_MEMORY_END - PAGE_SIZE * 3 + 1); //todo: it's copypast of multitasking.h
+	alloc_virt_pages(&new_process->address_space, tss, tss_area, 1, PAGE_PRESENT | PAGE_WRITABLE);	
+}
+
+void run_new_process () {
+	
+	phyaddr page_dir = (phyaddr)alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
+	// printf("0x%d", page_dir);
+	// return;
+	
+	init_paging_tables((uint32*)page_dir);
+	
+	
+	Process *new_process = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
+	init_kernel_address_space(&new_process->address_space, page_dir);
+	
+	bool suspend = false;
+	//init_tss(new_process);
+
+	new_process->suspend = suspend;
+	new_process->thread_count = 0;
+	strncpy(new_process->name, "first.asm", sizeof(new_process->name));
+	list_append((List*)&process_list, (ListItem*)new_process);
+
+	//0x12000 - I loaded first.asm there
+	Thread* new_thread = create_thread(new_process, (void*)0x12000, PAGE_SIZE, true, suspend);
+	// Thread *new_thread = alloc_virt_pages(&new_process->address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
+	// new_thread->process = new_process;
+	// new_thread->suspend = true;
+
+	// new_thread->stack_size = PAGE_SIZE;
+	list_append((List*)&thread_list, (ListItem*)new_thread);
+}
+
+void init_paging_tables (uint32* page_dir) {
+	phyaddr first_table_phyaddr = alloc_phys_pages(1);
+	temp_map_page(first_table_phyaddr);
+	uint32 *first_table = (uint32*)TEMP_PAGE;
+	//identity mapping of the first megabyte
+	uint16 entries_count =  0x100000 / 4096;
+	uint16 entry_value = 3; //11b
+	for (int i = 0; i < entries_count; i++) {
+		first_table[i] = entry_value;
+		entry_value += 0x1000;
+	}
+
+	phyaddr last_table_phyaddr = alloc_phys_pages(1);
+	temp_map_page(last_table_phyaddr);
+	void *second_table = alloc_virt_pages(&kernel_address_space, NULL, last_table_phyaddr, 1, PAGE_PRESENT | PAGE_WRITABLE);
+	uint32 *last_table = (uint32*)TEMP_PAGE;
+	//mapping of the last page table
+	entry_value = 3 | 0x11000; //11b | 0x11000
+	for (int i = 0; i < PAGES_PER_TABLE; i++) {
+		last_table[i] = entry_value;
+		entry_value += 0x1000;
+	}
+	//map kernel stack
+	last_table[1020] = 0x4003; //0x4000 + 11b
+	//map kernel page table
+	last_table[1021] = 0x3003; //0x3000 + 11b
+
+	page_dir[0] = first_table_phyaddr + 7; // 7 == 111b
+	page_dir[1023] = last_table_phyaddr + 7; // 7 == 111b
 }

@@ -295,7 +295,7 @@ stage2:
 	rep stosw
 	; fill the page directory that starts at 4096 (0x1000)
 	mov dword[0x1000], 0x2000 + 111b ; points to first page table
-	mov dword[0x1FFC], 0x3000 + 111b	; last page table record, 8188 (0x1FFC) = 4096 (page directory base) + 4096 (page directory size) - 4 (size of one page directory record)
+	mov dword[0x1FFC], 0x3000 + 111b ; last page table record, 8188 (0x1FFC) = 4096 (page directory base) + 4096 (page directory size) - 4 (size of one page directory record)
 	
 	; fill the first page table
 	mov eax, 11b
