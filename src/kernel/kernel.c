@@ -60,7 +60,7 @@ void init_floppy() {
 	flpydsk_install();
 	
 	// set DMA buffer to 64k
-	flpydsk_set_dma(0x12000);//todo: use physical memory manager
+	flpydsk_set_dma(0x55000);//todo: use physical memory manager
 }
 
 bool is_last_memory_map_entry(struct memory_map_entry *entry);
@@ -195,13 +195,19 @@ void init_tss (Process *new_process) {
 }
 
 void run_new_process () {
+	// void *test = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
 	
-	phyaddr page_dir = (phyaddr)alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
-	// printf("0x%d", page_dir);
+	// printf("!!!! 0x%x\n\n", get_page_info(kernel_page_dir, (void*)test));
 	// return;
-	
-	init_paging_tables((uint32*)page_dir);
-	
+	phyaddr page_dir = alloc_phys_pages(1);
+	// phyaddr page_dir = get_page_info(kernel_page_dir, (void*)test) - 3;
+		// printf("0x%x", page_dir);
+		// return;
+
+	temp_map_page(page_dir);
+	memset((void*)TEMP_PAGE, 0, PAGE_SIZE);
+	printf("0x%x", page_dir);
+	init_paging_tables(page_dir);
 	
 	Process *new_process = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
 	init_kernel_address_space(&new_process->address_space, page_dir);
@@ -215,20 +221,26 @@ void run_new_process () {
 	list_append((List*)&process_list, (ListItem*)new_process);
 
 	//0x12000 - I loaded first.asm there
-	Thread* new_thread = create_thread(new_process, (void*)0x12000, PAGE_SIZE, true, suspend);
+	Thread* new_thread = create_thread(new_process, (void*)0x55000, PAGE_SIZE, true, suspend);
 	// Thread *new_thread = alloc_virt_pages(&new_process->address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
 	// new_thread->process = new_process;
 	// new_thread->suspend = true;
 
 	// new_thread->stack_size = PAGE_SIZE;
-	list_append((List*)&thread_list, (ListItem*)new_thread);
+	// list_append((List*)&thread_list, (ListItem*)new_thread);
 }
 
-void init_paging_tables (uint32* page_dir) {
+void init_paging_tables (phyaddr page_dir) {
 	phyaddr first_table_phyaddr = alloc_phys_pages(1);
+	phyaddr last_table_phyaddr = alloc_phys_pages(1);
+
+	temp_map_page(page_dir);
+	((uint32*)TEMP_PAGE)[0] = first_table_phyaddr | 7; // 7 == 111b
+	((uint32*)TEMP_PAGE)[1023] = last_table_phyaddr | 7; // 7 == 111b
+
+	//fill the first megabyte of first page table
 	temp_map_page(first_table_phyaddr);
 	uint32 *first_table = (uint32*)TEMP_PAGE;
-	//identity mapping of the first megabyte
 	uint16 entries_count =  0x100000 / 4096;
 	uint16 entry_value = 3; //11b
 	for (int i = 0; i < entries_count; i++) {
@@ -236,21 +248,16 @@ void init_paging_tables (uint32* page_dir) {
 		entry_value += 0x1000;
 	}
 
-	phyaddr last_table_phyaddr = alloc_phys_pages(1);
+	//fill last page table
 	temp_map_page(last_table_phyaddr);
-	void *second_table = alloc_virt_pages(&kernel_address_space, NULL, last_table_phyaddr, 1, PAGE_PRESENT | PAGE_WRITABLE);
 	uint32 *last_table = (uint32*)TEMP_PAGE;
-	//mapping of the last page table
-	entry_value = 3 | 0x11000; //11b | 0x11000
+	entry_value = 0x11000 | 3; // 0x11000 | 11b
 	for (int i = 0; i < PAGES_PER_TABLE; i++) {
 		last_table[i] = entry_value;
 		entry_value += 0x1000;
 	}
 	//map kernel stack
-	last_table[1020] = 0x4003; //0x4000 + 11b
+	last_table[1020] = 0x4000 | 3; //0x4000 + 11b
 	//map kernel page table
-	last_table[1021] = 0x3003; //0x3000 + 11b
-
-	page_dir[0] = first_table_phyaddr + 7; // 7 == 111b
-	page_dir[1023] = last_table_phyaddr + 7; // 7 == 111b
+	last_table[1021] = 0x3000 | 3; //0x3000 + 11b
 }

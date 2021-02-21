@@ -3,7 +3,7 @@
 #include "interrupts.h"
 #include "multitasking.h"
 
-TSS *tss = (void*)(KERNEL_MEMORY_END - PAGE_SIZE * 3 + 1);
+TSS *tss = (void*)(USER_MEMORY_END - PAGE_SIZE * 3 + 1);
 
 bool multitasking_enabled = false;
 
@@ -12,10 +12,10 @@ void init_multitasking() {
 	list_init(&thread_list);
 	kernel_process = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
 	init_kernel_address_space(&kernel_process->address_space, kernel_page_dir);
-	alloc_virt_pages(&kernel_process->address_space, tss, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
-	tss->esp0 = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE | PAGE_GLOBAL);
-	tss->ss0 = 16;
-	tss->io_map_offset = (uint32)((uint32)tss->io_map - (uint32)tss);
+	// alloc_virt_pages(&kernel_process->address_space, tss, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
+	// tss->esp0 = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE | PAGE_GLOBAL);
+	// tss->ss0 = 16;
+	// tss->io_map_offset = (uint32)((uint32)tss->io_map - (uint32)tss);
 	kernel_process->suspend = false;
 	kernel_process->thread_count = 1;
 	strncpy(kernel_process->name, "Kernel", sizeof(kernel_process->name));
