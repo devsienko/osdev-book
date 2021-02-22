@@ -282,7 +282,7 @@ get_memory_map:
 stage2:
 	; load kernel
 	mov si, kernel_name
-	mov bx, 0x11000 / 16
+	mov bx, 0x11000 / 16 ; 16 - because we load 2-byte pieces
 	call load_file
 	
 	jmp .prepare_start32
@@ -316,8 +316,8 @@ stage2:
 	add eax, 0x1000
 	loop @b
 	
-	mov dword[0x3FF4], 0x4000 + 11b ; Kernel stack
-	mov dword[0x3FF8], 0x3000 + 11b ; Kernel page table
+	; mov dword[0x3FF4], 0x4000 + 11b ; Kernel stack
+	mov dword[0x3FF8], 0x3000 + 11b ; Kernel page table, we use it as KERNEL_PAGE_TABLE
 	
 	; load page directory to CR3
 	mov eax, 0x1000

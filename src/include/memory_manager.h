@@ -28,7 +28,7 @@ void KERNEL_BSS_BASE();
 void KERNEL_END();
 
 #define KERNEL_PAGE_TABLE ((void*)0xFFFFE000)
-#define TEMP_PAGE ((void*)0xFFFFF000)
+#define TEMP_PAGE ((void*)0xFFFFF000) // the last entry of the last page table
 #define TEMP_PAGE_INFO ((size_t)KERNEL_PAGE_TABLE + (((size_t)TEMP_PAGE >> PAGE_OFFSET_BITS) & PAGE_TABLE_INDEX_MASK) * sizeof(phyaddr))
 
 #define USER_MEMORY_START ((void*)0)

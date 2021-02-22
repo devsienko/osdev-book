@@ -39,7 +39,7 @@ void kernel_main(uint8 boot_disk_id, void *memory_map) {
 		in_string(buffer, sizeof(buffer));
 		if(!strcmp("runp", buffer))
 			run_p();
-		else if(!strcmp("showp", buffer))
+		else if(!strcmp("ps", buffer))
 			show_p();
 		else if(!strcmp("read", buffer))
 			cmd_read_sect();
@@ -194,47 +194,13 @@ void init_tss (Process *new_process) {
 	alloc_virt_pages(&new_process->address_space, tss, tss_area, 1, PAGE_PRESENT | PAGE_WRITABLE);	
 }
 
-void run_new_process () {
-	// void *test = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
-	
-	// printf("!!!! 0x%x\n\n", get_page_info(kernel_page_dir, (void*)test));
-	// return;
-	phyaddr page_dir = alloc_phys_pages(1);
-	// phyaddr page_dir = get_page_info(kernel_page_dir, (void*)test) - 3;
-		// printf("0x%x", page_dir);
-		// return;
-
-	temp_map_page(page_dir);
-	memset((void*)TEMP_PAGE, 0, PAGE_SIZE);
-	printf("0x%x", page_dir);
-	init_paging_tables(page_dir);
-	
-	Process *new_process = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
-	init_kernel_address_space(&new_process->address_space, page_dir);
-	
-	bool suspend = false;
-	//init_tss(new_process);
-
-	new_process->suspend = suspend;
-	new_process->thread_count = 0;
-	strncpy(new_process->name, "first.asm", sizeof(new_process->name));
-	list_append((List*)&process_list, (ListItem*)new_process);
-
-	//0x12000 - I loaded first.asm there
-	Thread* new_thread = create_thread(new_process, (void*)0x55000, PAGE_SIZE, true, suspend);
-	// Thread *new_thread = alloc_virt_pages(&new_process->address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
-	// new_thread->process = new_process;
-	// new_thread->suspend = true;
-
-	// new_thread->stack_size = PAGE_SIZE;
-	// list_append((List*)&thread_list, (ListItem*)new_thread);
-}
-
-void init_paging_tables (phyaddr page_dir) {
+phyaddr init_paging_tables () {
 	phyaddr first_table_phyaddr = alloc_phys_pages(1);
 	phyaddr last_table_phyaddr = alloc_phys_pages(1);
 
+	phyaddr page_dir = alloc_phys_pages(1);
 	temp_map_page(page_dir);
+	memset((void*)TEMP_PAGE, 0, PAGE_SIZE);
 	((uint32*)TEMP_PAGE)[0] = first_table_phyaddr | 7; // 7 == 111b
 	((uint32*)TEMP_PAGE)[1023] = last_table_phyaddr | 7; // 7 == 111b
 
@@ -257,7 +223,49 @@ void init_paging_tables (phyaddr page_dir) {
 		entry_value += 0x1000;
 	}
 	//map kernel stack
-	last_table[1020] = 0x4000 | 3; //0x4000 + 11b
+	//last_table[1020] = 0x4000 | 3; //0x4000 + 11b
 	//map kernel page table
-	last_table[1021] = 0x3000 | 3; //0x3000 + 11b
+	last_table[1022] = 0x3000 | 3; //0x3000 + 11b
+
+	return page_dir;
+}
+
+void run_new_process () {
+	// void *test = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
+	
+	// printf("!!!! 0x%x\n\n", get_page_info(kernel_page_dir, (void*)test));
+	// return;
+	
+	// phyaddr page_dir = get_page_info(kernel_page_dir, (void*)test) - 3;
+		// printf("0x%x", page_dir);
+		// return;
+	
+	// printf("0x%x", page_dir);
+	// phyaddr page_dir = init_paging_tables(page_dir);
+	phyaddr page_dir = 0x1000;
+	
+	Process *new_process = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, 
+		PAGE_PRESENT | PAGE_WRITABLE);
+	init_address_space(&new_process->address_space, page_dir);
+	
+	bool suspend = false;
+	//init_tss(new_process);
+
+	new_process->suspend = suspend;
+	new_process->thread_count = 0;
+	strncpy(new_process->name, "first.asm", sizeof(new_process->name));
+	list_append((List*)&process_list, (ListItem*)new_process);
+
+	//0x12000 - I loaded first.asm there
+	// Thread *thread = create_thread(new_process, (void*)0x55000, 1, true, suspend);
+	create_thread(new_process, (void*)0x55000, 1, true, suspend);
+
+	// printf("!!!! thread->stack_base = 0x%x", thread->stack_base);
+	// printf("\n\n!!!! thread->stack_base = 0x%x", get_page_info(new_process->address_space.page_dir, thread->stack_base));
+	// Thread *new_thread = alloc_virt_pages(&new_process->address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
+	// new_thread->process = new_process;
+	// new_thread->suspend = true;
+
+	// new_thread->stack_size = PAGE_SIZE;
+	// list_append((List*)&thread_list, (ListItem*)new_thread);
 }

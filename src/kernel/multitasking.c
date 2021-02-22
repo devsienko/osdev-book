@@ -43,13 +43,15 @@ void switch_task(Registers *regs) {
 	}
 }
 
-Thread *create_thread(Process *process, void *entry_point, size_t stack_size, bool kernel, bool suspend) {
+Thread *create_thread(Process *process, void *entry_point, size_t stack_size_in_pages, 
+	bool kernel, bool suspend) {
+		
 	Thread *thread = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
 	thread->process = process;
 	thread->suspend = suspend;
-	thread->stack_size = stack_size;
-	thread->stack_base = alloc_virt_pages(&process->address_space, NULL, -1, (stack_size + PAGE_SIZE - 1) & ~PAGE_OFFSET_MASK, PAGE_PRESENT | PAGE_WRITABLE |
-		(kernel ? 0 : PAGE_USER));
+	thread->stack_size = stack_size_in_pages << PAGE_OFFSET_BITS;
+	thread->stack_base = alloc_virt_pages(&process->address_space, NULL, -1, 
+		stack_size_in_pages, PAGE_PRESENT | PAGE_WRITABLE | (kernel ? 0 : PAGE_USER));
 	memset(&thread->state, 0, sizeof(Registers));
 	uint32 data_selector = (kernel ? 16 : 27);
 	uint32 code_selector = (kernel ? 8 : 35);
