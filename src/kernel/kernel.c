@@ -223,8 +223,7 @@ phyaddr init_paging_tables () {
 }
 
 void run_new_process () {
-	phyaddr page_dir = init_paging_tables(page_dir);
-	
+	phyaddr page_dir = init_paging_tables();
 	Process *new_process = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, 
 		PAGE_PRESENT | PAGE_WRITABLE);
 
@@ -237,16 +236,6 @@ void run_new_process () {
 	strncpy(new_process->name, "first.asm", sizeof(new_process->name));
 	list_append((List*)&process_list, (ListItem*)new_process);
 
-	//0x12000 - I loaded first.asm there
-	// Thread *thread = create_thread(new_process, (void*)0x55000, 1, true, suspend);
+	//0x55000 - first.asm is loaded there
 	create_thread(new_process, (void*)0x55000, 1, true, suspend);
-
-	// printf("!!!! thread->stack_base = 0x%x", thread->stack_base);
-	// printf("\n\n!!!! thread->stack_base = 0x%x", get_page_info(new_process->address_space.page_dir, thread->stack_base));
-	// Thread *new_thread = alloc_virt_pages(&new_process->address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
-	// new_thread->process = new_process;
-	// new_thread->suspend = true;
-
-	// new_thread->stack_size = PAGE_SIZE;
-	// list_append((List*)&thread_list, (ListItem*)new_thread);
 }
