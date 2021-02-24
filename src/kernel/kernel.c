@@ -182,72 +182,48 @@ void cmd_exec() {
 	printf("\nDone!\n\n");
 }
 
-void init_tss (Process *new_process) {
-	phyaddr tss_area = alloc_phys_pages(1);
-	temp_map_page(tss_area);
-
-	TSS* tss_pointer = (TSS*)TEMP_PAGE;
-	tss_pointer->esp0 = alloc_virt_pages(&new_process->address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE | PAGE_GLOBAL);
-	tss_pointer->ss0 = 16;
-	tss_pointer->io_map_offset = (uint32)((uint32)tss_pointer->io_map - (uint32)tss_pointer);
-	TSS *tss = (void*)(KERNEL_MEMORY_END - PAGE_SIZE * 3 + 1); //todo: it's copypast of multitasking.h
-	alloc_virt_pages(&new_process->address_space, tss, tss_area, 1, PAGE_PRESENT | PAGE_WRITABLE);	
-}
-
 phyaddr init_paging_tables () {
-	phyaddr first_table_phyaddr = 0x2000;
-	// phyaddr last_table_phyaddr = alloc_phys_pages(1);
-	// phyaddr table_512_phyaddr = 0x03fee000;
-	phyaddr table_1022_phyaddr = 0x03fec000;
-	phyaddr last_table_phyaddr = 0x3000;
+	uint16 kernel_index = 1022;
+
+	phyaddr first_table_phyaddr = alloc_phys_pages(1);
+	phyaddr last_table_phyaddr = alloc_phys_pages(1);
+	phyaddr kernel_table_phyaddr = 0x03fec000;
 
 	phyaddr page_dir = alloc_phys_pages(1);
 	temp_map_page(page_dir);
 	memset((void*)TEMP_PAGE, 0, PAGE_SIZE);
+
 	((uint32*)TEMP_PAGE)[0] = first_table_phyaddr | 7; // 7 == 111b
-	// ((uint32*)TEMP_PAGE)[512] = table_512_phyaddr | 27; // 7 == 111b
-	((uint32*)TEMP_PAGE)[1022] = table_1022_phyaddr | 7; // 7 == 111b
+	((uint32*)TEMP_PAGE)[kernel_index] = kernel_table_phyaddr | 7; // 7 == 111b
 	((uint32*)TEMP_PAGE)[1023] = last_table_phyaddr | 7; // 7 == 111b
 
-	// //fill the first megabyte of first page table
-	// temp_map_page(first_table_phyaddr);
-	// uint32 *first_table = (uint32*)TEMP_PAGE;
-	// uint16 entries_count =  0x100000 / 4096;
-	// uint16 entry_value = 3; //11b
-	// for (int i = 0; i < entries_count; i++) {
-	// 	first_table[i] = entry_value;
-	// 	entry_value += 0x1000;
-	// }
+	//fill the first megabyte of first page table
+	temp_map_page(first_table_phyaddr);
+	uint32 *first_table = (uint32*)TEMP_PAGE;
+	uint16 entries_count =  0x100000 / 4096;
+	uint32 entry_value = 3; //11b
+	for (int i = 0; i < entries_count; i++) {
+		first_table[i] = entry_value;
+		entry_value += 0x1000;
+	}
 
 	//fill last page table
-	// temp_map_page(last_table_phyaddr);
-	// uint32 *last_table = (uint32*)TEMP_PAGE;
-	// entry_value = 0x11000 | 3; // 0x11000 | 11b
-	// for (int i = 0; i < PAGES_PER_TABLE; i++) {
-	// 	last_table[i] = entry_value;
-	// 	entry_value += 0x1000;
-	// }
-	// //map kernel stack
-	// //last_table[1020] = 0x4000 | 3; //0x4000 + 11b
-	// //map kernel page table
-	// last_table[1022] = 0x3000 | 3; //0x3000 + 11b
+	temp_map_page(last_table_phyaddr);
+	uint32 *last_table = (uint32*)TEMP_PAGE;
+	entry_value = 0x11000 | 3; // 0x11000 | 11b
+	for (int i = 0; i < PAGES_PER_TABLE; i++) {
+		last_table[i] = entry_value;
+		entry_value += 0x1000;
+	}
+	//map kernel stack
+	//last_table[1020] = 0x4000 | 3; //0x4000 + 11b
+	last_table[kernel_index] = 0x3000 | 3; //0x3000 + 11b
 
 	return page_dir;
 }
 
 void run_new_process () {
-	// void *test = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
-	
-	// printf("!!!! 0x%x\n\n", get_page_info(kernel_page_dir, (void*)test));
-	// return;
-	
-	// phyaddr page_dir = get_page_info(kernel_page_dir, (void*)test) - 3;
-		// printf("0x%x", page_dir);
-		// return;
-	
-	// printf("0x%x", page_dir);
 	phyaddr page_dir = init_paging_tables(page_dir);
-	// phyaddr page_dir = 0x1000;
 	
 	Process *new_process = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, 
 		PAGE_PRESENT | PAGE_WRITABLE);
@@ -255,7 +231,6 @@ void run_new_process () {
 	init_address_space(&new_process->address_space, page_dir);
 	
 	bool suspend = false;
-	//init_tss(new_process);
 
 	new_process->suspend = suspend;
 	new_process->thread_count = 0;
