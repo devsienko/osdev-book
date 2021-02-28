@@ -6,7 +6,7 @@
 #include "floppy.h"
 #include "timer.h"
 
-void kernel_main(uint8 boot_disk_id, void *memory_map) {
+void kernel_main(uint8 boot_disk_id, void *memory_map, uint64 first_file_sector_number) {
 	init_memory_manager(memory_map);
 	init_interrupts();
 	init_multitasking();
@@ -16,9 +16,10 @@ void kernel_main(uint8 boot_disk_id, void *memory_map) {
 	clear_screen();
 
 	printf("Welcome to SUN OS!\n\n");
-
+	
 	printf("Boot disk id ------- %d\n", boot_disk_id);
-	printf("Memory map --------- 0x%x\n\n", memory_map);
+	printf("Memory map --------- 0x%x\n", memory_map);
+	printf("first_file_sector_number: 0x%x!\n\n", first_file_sector_number);
 
 	display_memory_map(memory_map);
 
@@ -215,6 +216,7 @@ phyaddr init_paging_tables () {
 		last_table[i] = entry_value;
 		entry_value += 0x1000;
 	}
+
 	//map kernel stack
 	//last_table[1020] = 0x4000 | 3; //0x4000 + 11b
 	last_table[kernel_index] = 0x3000 | 3; //0x3000 + 11b
