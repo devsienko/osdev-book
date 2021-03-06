@@ -5,6 +5,9 @@
 #include "multitasking.h"
 #include "floppy.h"
 #include "timer.h"
+#include "listfs.h"
+
+uint32 find_file (uint32 file_sector_number);
 
 void kernel_main(uint8 boot_disk_id, void *memory_map, uint64 first_file_sector_number) {
 	init_memory_manager(memory_map);
@@ -12,6 +15,7 @@ void kernel_main(uint8 boot_disk_id, void *memory_map, uint64 first_file_sector_
 	init_multitasking();
 	init_tty();
 	init_floppy();
+	init_list_fs(first_file_sector_number);
 	set_text_attr(63);
 	clear_screen();
 
@@ -48,6 +52,10 @@ void kernel_main(uint8 boot_disk_id, void *memory_map, uint64 first_file_sector_
 			cmd_get_ticks();
 		else if(!strcmp("exec", buffer))
 			cmd_exec();
+		else if(!strcmp("ls", buffer))
+			show_files((uint32)first_file_sector_number);
+		else if(!strcmp("find", buffer))
+			printf("result: %d\n", find_file((uint32)first_file_sector_number));
 		else 
 			printf("You typed: %s\n", buffer);
 	}
@@ -61,7 +69,7 @@ void init_floppy() {
 	flpydsk_install();
 	
 	// set DMA buffer to 64k
-	flpydsk_set_dma(0x55000);//todo: use physical memory manager
+	flpydsk_set_dma(0x20000);//todo: use physical memory manager
 }
 
 bool is_last_memory_map_entry(struct memory_map_entry *entry);
@@ -123,6 +131,38 @@ void run_p() {
 	// 	}
 	// }
 	run_new_process();
+}
+
+
+void show_files (uint32 file_sector_number) {
+	listfs_file_header *file_header = get_file_info(file_sector_number);
+	
+	if(strcmp("first.bin", file_header->name)) 
+		printf("name: %s\n", file_header->name);
+	else 
+		printf("name: ***%s***\n", file_header->name);
+	if(CHECK_BIT(file_header->flags, 1))
+		printf(" type: directory");
+	else
+		printf(" type: file\n");
+	if(file_header->parent == -1)
+		printf(" directory: root\n");
+	else
+		printf(" directory: not root\n");
+	printf(" size: %d bytes\n", (uint32)file_header->size);
+	if(file_header->next != -1) {
+		printf("\n");
+		show_files((uint32)file_header->next);
+	}
+}
+
+uint32 find_file (uint32 file_sector_number) {
+	listfs_file_header *file_header = get_file_info(file_sector_number);
+	
+	if(strcmp("first.bin", file_header->name) && file_header->next != -1) 
+		return find_file((uint32)file_header->next);
+	else 
+		return (uint32)file_header->size;
 }
 
 void cmd_get_ticks() { 
@@ -238,6 +278,6 @@ void run_new_process () {
 	strncpy(new_process->name, "first.asm", sizeof(new_process->name));
 	list_append((List*)&process_list, (ListItem*)new_process);
 
-	//0x55000 - first.asm is loaded there
-	create_thread(new_process, (void*)0x55000, 1, true, suspend);
+	//0x20000 - first.asm is loaded there
+	create_thread(new_process, (void*)0x20000, 1, true, suspend);
 }

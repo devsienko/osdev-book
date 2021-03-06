@@ -7,6 +7,7 @@ typedef enum {
 } bool;
 
 #define NULL ((void*)0)
+#define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
 typedef unsigned char uint8;
 typedef signed char int8;

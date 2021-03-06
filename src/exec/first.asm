@@ -1,6 +1,6 @@
 use32
 
-org 0x55000
+org 0x20000
 
 mov al, 75; capital K code
 ; mov byte[0xB8000 + (25 * 80 - 2) * 2], 75
