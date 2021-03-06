@@ -156,13 +156,20 @@ void show_files (uint32 file_sector_number) {
 	}
 }
 
+uint32 get_file_data_pointer (uint32 sector_list_sector_number) {
+	//we support only 1-sector size files right now
+	uint64 *sector_list = flpydsk_read_sector(sector_list_sector_number);
+	return (uint32)*sector_list;
+}
+
 uint32 find_file (uint32 file_sector_number) {
 	listfs_file_header *file_header = get_file_info(file_sector_number);
 	
 	if(strcmp("first.bin", file_header->name) && file_header->next != -1) 
 		return find_file((uint32)file_header->next);
-	else 
-		return (uint32)file_header->size;
+	else {
+		return get_file_data_pointer((uint32)file_header->data);
+	}
 }
 
 void cmd_get_ticks() { 

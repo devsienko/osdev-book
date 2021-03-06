@@ -423,7 +423,7 @@ uint8 flpydsk_get_working_drive () {
 }
 
 // read a sector
-uint8* flpydsk_read_sector (int sectorLBA) {
+uint8* flpydsk_read_sector (uint32 sectorLBA) {
 	if (current_drive >= 4)
 		return 0;
 
