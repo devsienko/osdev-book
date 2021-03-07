@@ -7,8 +7,6 @@
 #include "timer.h"
 #include "listfs.h"
 
-uint32 find_file (uint32 file_sector_number);
-
 void kernel_main(uint8 boot_disk_id, void *memory_map, uint64 first_file_sector_number) {
 	init_memory_manager(memory_map);
 	init_interrupts();
@@ -42,20 +40,16 @@ void kernel_main(uint8 boot_disk_id, void *memory_map, uint64 first_file_sector_
 		char buffer[256];
 		out_string("Command>");
 		in_string(buffer, sizeof(buffer));
-		if(!strcmp("runp", buffer))
-			run_p();
+		if(!strcmp("run", buffer))
+			run_new_process((uint32)first_file_sector_number);
 		else if(!strcmp("ps", buffer))
 			show_p();
 		else if(!strcmp("read", buffer))
 			cmd_read_sect();
 		else if(!strcmp("ticks", buffer))
 			cmd_get_ticks();
-		else if(!strcmp("exec", buffer))
-			cmd_exec();
 		else if(!strcmp("ls", buffer))
 			show_files((uint32)first_file_sector_number);
-		else if(!strcmp("find", buffer))
-			printf("result: %d\n", find_file((uint32)first_file_sector_number));
 		else 
 			printf("You typed: %s\n", buffer);
 	}
@@ -119,21 +113,6 @@ void show_p() {
 	}
 }
 
-void run_p() {
-	// char* video_mem = 0xB8000;
-	// int rows = 25;
-	// int columns = 80;
-	// char initChar = '&';
-	// while (true) {
-	// 	for(int i = 0; i < 25; i++) {
-	// 		int offset = i * columns + 10;
-	// 		*(video_mem + offset * 2) = initChar++;
-	// 	}
-	// }
-	run_new_process();
-}
-
-
 void show_files (uint32 file_sector_number) {
 	listfs_file_header *file_header = get_file_info(file_sector_number);
 	
@@ -145,28 +124,34 @@ void show_files (uint32 file_sector_number) {
 		printf(" type: directory");
 	else
 		printf(" type: file\n");
-	if(file_header->parent == -1)
+	if(file_header->parent == LISTFS_INDICATOR_VALUE)
 		printf(" directory: root\n");
 	else
 		printf(" directory: not root\n");
 	printf(" size: %d bytes\n", (uint32)file_header->size);
-	if(file_header->next != -1) {
+	if(file_header->next != LISTFS_INDICATOR_VALUE) {
 		printf("\n");
 		show_files((uint32)file_header->next);
 	}
 }
 
 uint32 get_file_data_pointer (uint32 sector_list_sector_number) {
-	//we support only 1-sector size files right now
+	//we support only 1-sector size files right now, so it's a little bit crazy function
 	uint64 *sector_list = flpydsk_read_sector(sector_list_sector_number);
-	return (uint32)*sector_list;
+	uint32 result = -1;
+	for(int i = 0; ; i++) {
+		if(sector_list[i] == LISTFS_INDICATOR_VALUE)
+			break;
+		result = (uint32)sector_list[i];
+	}
+	return result;
 }
 
-uint32 find_file (uint32 file_sector_number) {
+uint32 find_file (uint32 file_sector_number, char* file_name) {
 	listfs_file_header *file_header = get_file_info(file_sector_number);
 	
-	if(strcmp("first.bin", file_header->name) && file_header->next != -1) 
-		return find_file((uint32)file_header->next);
+	if(strcmp(file_name, file_header->name) && file_header->next != LISTFS_INDICATOR_VALUE) 
+		return find_file((uint32)file_header->next, file_name);
 	else {
 		return get_file_data_pointer((uint32)file_header->data);
 	}
@@ -207,27 +192,6 @@ void cmd_read_sect() {
 		printf("\n*** Error reading sector from disk");
 
 	printf("Done.\n");
-}
-
-void cmd_exec() {
-
-	uint32 sectornum = 0;
-	char sectornumbuf [4];
-	uint8* sector;
-
-	printf ("\nPlease type in the sector number [0 is default] > ");
-	in_string(sectornumbuf, sizeof(sectornumbuf));
-	sectornum = atoi(sectornumbuf);
-
-	printf("\nSector %d contents:\n\n", sectornum);
-
-	// read sector from disk
-	sector = (uint8*)flpydsk_read_sector(sectornum);
-
-	// void *address = 0x12000;
-	// goto *address;
-
-	printf("\nDone!\n\n");
 }
 
 phyaddr init_paging_tables () {
@@ -271,7 +235,14 @@ phyaddr init_paging_tables () {
 	return page_dir;
 }
 
-void run_new_process () {
+void run_new_process(uint32 file_sector_number) {
+	char file_name[256];
+	out_string("type bin file name: ");
+	in_string(file_name, sizeof(file_name));
+
+	uint32 file_data_sector_number = find_file(file_sector_number, file_name);
+	(uint8*)flpydsk_read_sector(file_data_sector_number);
+		
 	phyaddr page_dir = init_paging_tables();
 	Process *new_process = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, 
 		PAGE_PRESENT | PAGE_WRITABLE);

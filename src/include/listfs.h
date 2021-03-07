@@ -31,6 +31,7 @@ typedef struct {
 	uint64 access_time;
 } __attribute((packed)) listfs_file_header;
 
+#define LISTFS_INDICATOR_VALUE -1
 
 void init_list_fs (uint64 sector_number);
 listfs_file_header* get_first_file_info ();
