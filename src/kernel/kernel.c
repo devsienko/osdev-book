@@ -116,19 +116,20 @@ void show_p() {
 void show_files (uint32 file_sector_number) {
 	listfs_file_header *file_header = get_file_info(file_sector_number);
 	
-	if(strcmp("first.bin", file_header->name)) 
-		printf("name: %s\n", file_header->name);
-	else 
-		printf("name: ***%s***\n", file_header->name);
+	printf("name: %s\n", file_header->name);
+
 	if(CHECK_BIT(file_header->flags, 1))
 		printf(" type: directory");
 	else
 		printf(" type: file\n");
+
 	if(file_header->parent == LISTFS_INDICATOR_VALUE)
 		printf(" directory: root\n");
 	else
 		printf(" directory: not root\n");
+
 	printf(" size: %d bytes\n", (uint32)file_header->size);
+	
 	if(file_header->next != LISTFS_INDICATOR_VALUE) {
 		printf("\n");
 		show_files((uint32)file_header->next);
@@ -172,10 +173,8 @@ void cmd_read_sect() {
 
 	printf("\nSector %d contents:\n\n", sectornum);
 
-	// read sector from disk
 	sector = (uint8*)flpydsk_read_sector(sectornum);
 
-	// display sector
 	if (sector != 0) {
 		int i = 0;
 		for (int c = 0; c < 4; c++) {
