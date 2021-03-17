@@ -62,7 +62,7 @@ void init_floppy() {
 	// install floppy disk to IR 38, uses IRQ 6
 	flpydsk_install();
 	
-	// set DMA buffer to 64k
+	// set DMA buffer, limit 16mb
 	flpydsk_set_dma(0x20000);//todo: use physical memory manager
 }
 
@@ -193,7 +193,7 @@ void cmd_read_sect() {
 	printf("Done.\n");
 }
 
-phyaddr init_paging_tables () {
+phyaddr init_paging_tables (phyaddr memory_location_start) {
 	uint16 kernel_index = 1022;
 
 	phyaddr first_table_phyaddr = alloc_phys_pages(1);
@@ -208,15 +208,38 @@ phyaddr init_paging_tables () {
 	((uint32*)TEMP_PAGE)[kernel_index] = kernel_table_phyaddr | 7; // 7 == 111b
 	((uint32*)TEMP_PAGE)[1023] = last_table_phyaddr | 7; // 7 == 111b
 
-	//fill the first megabyte of first page table
+	//fill the FIRST megabyte address space
 	temp_map_page(first_table_phyaddr);
 	uint32 *first_table = (uint32*)TEMP_PAGE;
-	uint16 entries_count =  0x100000 / 4096;
-	uint32 entry_value = 3; //11b
+
+	uint32 video_memoty_start = 0xA0000;
+	uint32 video_memoty_end = 0xC0000;
+
+	//fill before video memory
+	uint32 entry_value = memory_location_start | 3; //3 = 11b
+	uint16 entries_count = video_memoty_start / PAGE_SIZE;
 	for (int i = 0; i < entries_count; i++) {
 		first_table[i] = entry_value;
 		entry_value += 0x1000;
 	}
+
+	//fill video memory, because we cannot access it in another case
+	uint16 prev_entries_count = entries_count;
+	uint32 video_memory_entry_value = video_memoty_start | 3; //3 = 11b
+	entries_count = prev_entries_count + ((video_memoty_end - video_memoty_start) / PAGE_SIZE);
+	for (int i = prev_entries_count; i < entries_count; i++) {
+		first_table[i] = video_memory_entry_value;
+		video_memory_entry_value += 0x1000;
+	}
+
+	//fill after video memory
+	// prev_entries_count = entries_count;
+	// entries_count = prev_entries_count + ((0x100000 - video_memoty_end) / PAGE_SIZE);
+	// entry_value = entry_value + (video_memoty_end - video_memoty_start);
+	// for (int i = prev_entries_count; i < entries_count; i++) {
+	// 	first_table[i] = entry_value;
+	// 	entry_value += 0x1000;
+	// }
 
 	//fill last page table
 	temp_map_page(last_table_phyaddr);
@@ -242,7 +265,7 @@ void run_new_process(uint32 file_sector_number) {
 	uint32 file_data_sector_number = find_file(file_sector_number, file_name);
 	(uint8*)flpydsk_read_sector(file_data_sector_number);
 		
-	phyaddr page_dir = init_paging_tables();
+	phyaddr page_dir = init_paging_tables(0);
 	Process *new_process = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, 
 		PAGE_PRESENT | PAGE_WRITABLE);
 

@@ -86,6 +86,7 @@ phyaddr get_page_info(phyaddr page_dir, void *vaddr);
 
 size_t get_free_memory_size();
 phyaddr alloc_phys_pages(size_t count);
+phyaddr alloc_phys_pages_low(size_t count);
 void free_phys_pages(phyaddr base, size_t count);
 
 void *alloc_virt_pages(AddressSpace *address_space, void *vaddr, phyaddr paddr, size_t count, unsigned int flags);

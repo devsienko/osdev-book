@@ -11,7 +11,7 @@ typedef struct {
 typedef struct {
 	phyaddr next;
 	phyaddr prev;
-	size_t size;
+	size_t size; // pages count
 } PhysMemoryBlock;
 
 size_t free_page_count = 0;
@@ -123,9 +123,86 @@ size_t get_free_memory_size() {
 	return free_page_count << PAGE_OFFSET_BITS;
 }
 
+phyaddr find_lower_block (size_t count) {
+	phyaddr memory_treshold = 0x1000000;// because of DMA buffer limitations
+	phyaddr cur_block = free_phys_memory_pointer;
+	phyaddr result = -1;
+	do {
+		temp_map_page(cur_block);
+	
+		if(cur_block < memory_treshold && (cur_block + count * PAGE_SIZE) < memory_treshold
+			&& ((PhysMemoryBlock*)TEMP_PAGE)->size >= count) {
+			return cur_block;
+		}
+
+		cur_block = ((PhysMemoryBlock*)TEMP_PAGE)->next;
+	} while (cur_block != free_phys_memory_pointer);
+
+	return result;
+}
+
+//count - count of pages
+//allocate memory starting with 1mb and higher
+phyaddr alloc_phys_pages_low(size_t count) {
+	if (free_phys_memory_pointer == -1 || free_page_count < count) 
+		return -1;
+	
+	phyaddr result = -1;
+	
+	mutex_get(&phys_memory_mutex, true);
+
+	result = find_lower_block(count);
+
+	if(result == -1)
+		return result;
+	
+	temp_map_page(result);
+
+	phyaddr next = ((PhysMemoryBlock*)TEMP_PAGE)->next;
+	phyaddr prev = ((PhysMemoryBlock*)TEMP_PAGE)->prev;
+	bool is_last_free_block = next == prev;
+
+	if (((PhysMemoryBlock*)TEMP_PAGE)->size == count) {
+		if(is_last_free_block) {
+			free_phys_memory_pointer = -1;
+			return result;
+		}
+
+		temp_map_page(next);
+		((PhysMemoryBlock*)TEMP_PAGE)->prev = prev;
+		temp_map_page(prev);
+		((PhysMemoryBlock*)TEMP_PAGE)->next = next;
+	}
+	else if (((PhysMemoryBlock*)TEMP_PAGE)->size > count) { 
+		phyaddr new_adderess = result + count * PAGE_SIZE;
+		uint8 *block_pointer = (uint8*)TEMP_PAGE;
+		block_pointer += PAGE_SIZE * count;
+		if(is_last_free_block) {			
+			((PhysMemoryBlock*)block_pointer)->size -= count;
+			((PhysMemoryBlock*)block_pointer)->next = new_adderess;
+			((PhysMemoryBlock*)block_pointer)->prev = new_adderess;
+		}
+		else {
+			((PhysMemoryBlock*)block_pointer)->size -= count;
+			((PhysMemoryBlock*)block_pointer)->next = next;
+			((PhysMemoryBlock*)block_pointer)->prev = prev;
+
+			temp_map_page(prev);
+			((PhysMemoryBlock*)TEMP_PAGE)->next = new_adderess;
+		}
+	}
+	if (result != -1) {
+		free_page_count -= count;
+	} 
+
+	mutex_release(&phys_memory_mutex);
+	return result;
+}
+
 //count - count of pages
 phyaddr alloc_phys_pages(size_t count) {
-	if (free_page_count < count) return -1;
+	if (free_page_count < count) 
+		return -1;
 	phyaddr result = -1;
 	mutex_get(&phys_memory_mutex, true);
 	if (free_phys_memory_pointer != -1) {
