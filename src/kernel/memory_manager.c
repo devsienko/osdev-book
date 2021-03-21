@@ -124,7 +124,7 @@ size_t get_free_memory_size() {
 }
 
 phyaddr find_lower_block (size_t count) {
-	phyaddr memory_treshold = 0x1000000;// because of DMA buffer limitations
+	phyaddr memory_treshold = 0x1000000;// because of DMA buffer limitations 16Mb
 	phyaddr cur_block = free_phys_memory_pointer;
 	phyaddr result = -1;
 	do {
@@ -139,6 +139,10 @@ phyaddr find_lower_block (size_t count) {
 	} while (cur_block != free_phys_memory_pointer);
 
 	return result;
+}
+
+phyaddr get_free_phys_memory_pointer() {
+	return free_phys_memory_pointer;
 }
 
 //count - count of pages
@@ -160,6 +164,7 @@ phyaddr alloc_phys_pages_low(size_t count) {
 
 	phyaddr next = ((PhysMemoryBlock*)TEMP_PAGE)->next;
 	phyaddr prev = ((PhysMemoryBlock*)TEMP_PAGE)->prev;
+	size_t init_page_size = ((PhysMemoryBlock*)TEMP_PAGE)->size;
 	bool is_last_free_block = next == prev;
 
 	if (((PhysMemoryBlock*)TEMP_PAGE)->size == count) {
@@ -172,23 +177,34 @@ phyaddr alloc_phys_pages_low(size_t count) {
 		((PhysMemoryBlock*)TEMP_PAGE)->prev = prev;
 		temp_map_page(prev);
 		((PhysMemoryBlock*)TEMP_PAGE)->next = next;
+
+		if(free_phys_memory_pointer == result) {
+			free_phys_memory_pointer = next;
+		}
 	}
 	else if (((PhysMemoryBlock*)TEMP_PAGE)->size > count) { 
 		phyaddr new_adderess = result + count * PAGE_SIZE;
-		uint8 *block_pointer = (uint8*)TEMP_PAGE;
-		block_pointer += PAGE_SIZE * count;
+		temp_map_page(new_adderess);
+		// uint8 *block_pointer = (uint8*)TEMP_PAGE;
+		// block_pointer += PAGE_SIZE * count;
 		if(is_last_free_block) {			
-			((PhysMemoryBlock*)block_pointer)->size -= count;
-			((PhysMemoryBlock*)block_pointer)->next = new_adderess;
-			((PhysMemoryBlock*)block_pointer)->prev = new_adderess;
+			((PhysMemoryBlock*)TEMP_PAGE)->size = init_page_size - count;
+			((PhysMemoryBlock*)TEMP_PAGE)->next = new_adderess;
+			((PhysMemoryBlock*)TEMP_PAGE)->prev = new_adderess;
+
+			free_phys_memory_pointer = new_adderess;
 		}
 		else {
-			((PhysMemoryBlock*)block_pointer)->size -= count;
-			((PhysMemoryBlock*)block_pointer)->next = next;
-			((PhysMemoryBlock*)block_pointer)->prev = prev;
+			((PhysMemoryBlock*)TEMP_PAGE)->size = init_page_size - count;
+			((PhysMemoryBlock*)TEMP_PAGE)->next = next;
+			((PhysMemoryBlock*)TEMP_PAGE)->prev = prev;
 
 			temp_map_page(prev);
 			((PhysMemoryBlock*)TEMP_PAGE)->next = new_adderess;
+			
+			if(free_phys_memory_pointer == result) {
+				free_phys_memory_pointer = new_adderess;
+			}
 		}
 	}
 	if (result != -1) {
