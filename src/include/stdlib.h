@@ -59,7 +59,7 @@ void mutex_release(Mutex *mutex);
 
 void memset(void *mem, char value, size_t count);
 void memset_word(void *mem, uint16 value, size_t count);
-void memcpy(void *dest, void *src, size_t count);
+void *memcpy(void *dest, void *src, size_t count);
 int memcmp(void *mem1, void *mem2, size_t count);
 void *memchr(void *mem, char value, size_t count);
 

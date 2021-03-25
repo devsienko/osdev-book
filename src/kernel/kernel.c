@@ -1,6 +1,7 @@
 #include "tty.h"
 #include "stdlib.h"
 #include "memory_manager.h"
+#include "dma.h"
 #include "interrupts.h"
 #include "multitasking.h"
 #include "floppy.h"
@@ -63,7 +64,7 @@ void init_floppy() {
 	flpydsk_install();
 	
 	// set DMA buffer, limit 16mb
-	flpydsk_set_dma(0x20000);//todo: use physical memory manager
+	flpydsk_set_dma(TEMP_DMA_BUFFER_ADDR);//todo: use physical memory manager
 }
 
 bool is_last_memory_map_entry(struct memory_map_entry *entry);
@@ -193,7 +194,7 @@ void cmd_read_sect() {
 	printf("Done.\n");
 }
 
-phyaddr init_paging_tables (phyaddr memory_location_start) {
+phyaddr init_paging_tables(phyaddr memory_location_start) {
 	uint16 kernel_index = 1022;
 
 	phyaddr first_table_phyaddr = alloc_phys_pages(1);
@@ -241,6 +242,17 @@ phyaddr init_paging_tables (phyaddr memory_location_start) {
 	// 	entry_value += 0x1000;
 	// }
 
+	//identity mapping second Mb of memory (for testing purposes)
+	phyaddr start_second_mb = 0x100000;
+	phyaddr end_second_mb = 0x200000;
+	int start_index = start_second_mb / PAGE_SIZE;
+	entries_count = start_index + ((end_second_mb - start_second_mb) / PAGE_SIZE);
+	entry_value = start_second_mb | 3; //3 = 11b
+	for (int i = start_index; i < entries_count; i++) {
+		first_table[i] = entry_value;
+		entry_value += 0x1000;
+	}
+
 	//fill last page table
 	temp_map_page(last_table_phyaddr);
 	uint32 *last_table = (uint32*)TEMP_PAGE;
@@ -257,12 +269,19 @@ phyaddr init_paging_tables (phyaddr memory_location_start) {
 	return page_dir;
 }
 
+phyaddr alloc_dma_buffer() {
+	phyaddr buffer = alloc_phys_pages_low(1);
+	flpydsk_set_dma(buffer);
+	return buffer;
+}
+
 void run_new_process(uint32 file_sector_number) {
 	char file_name[256];
 	out_string("type bin file name: ");
 	in_string(file_name, sizeof(file_name));
 
 	uint32 file_data_sector_number = find_file(file_sector_number, file_name);
+	phyaddr process_base = alloc_dma_buffer();
 	(uint8*)flpydsk_read_sector(file_data_sector_number);
 		
 	phyaddr page_dir = init_paging_tables(0);
@@ -275,9 +294,9 @@ void run_new_process(uint32 file_sector_number) {
 
 	new_process->suspend = suspend;
 	new_process->thread_count = 0;
-	strncpy(new_process->name, "first.asm", sizeof(new_process->name));
+	strncpy(new_process->name, file_name, sizeof(new_process->name));
 	list_append((List*)&process_list, (ListItem*)new_process);
 
 	//0x20000 - first.asm is loaded there
-	create_thread(new_process, (void*)0x20000, 1, true, suspend);
+	create_thread(new_process, (void*)process_base, 1, true, suspend);
 }

@@ -117,7 +117,7 @@ const int FLPY_SECTORS_PER_TRACK = 18;
 
 // You can change this as needed. It must be below 16MB and in identity mapped memory!
 // todo: use physical memory manager
-int DMA_BUFFER = 0x12000;
+int DMA_BUFFER = 0x20000;
 
 // FDC uses DMA channel 2
 const uint8 FDC_DMA_CHANNEL = 2;
