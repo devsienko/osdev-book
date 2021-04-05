@@ -51,6 +51,8 @@ void kernel_main(uint8 boot_disk_id, void *memory_map, uint64 first_file_sector_
 			cmd_get_ticks();
 		else if(!strcmp("ls", buffer))
 			show_files((uint32)first_file_sector_number);
+		else if(!strcmp("test", buffer))
+			asm("int $0x30");//0x20 - irq_base, 16 - handler index, 0x20 + 16 = 0x30
 		else 
 			printf("You typed: %s\n", buffer);
 	}

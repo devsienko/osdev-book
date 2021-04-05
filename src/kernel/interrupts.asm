@@ -12,7 +12,7 @@ IRQ # index # _handler:
 	jmp common_irq_handler	
 }
 
-rept 16 i {
+rept 17 i {
 	IRQ_handler i
 }
 
@@ -40,8 +40,8 @@ common_irq_handler:
 
 section ".data" writable
 
-; Таблица обработчиков IRQ прерываний
+; table of IRQ handlers
 _irq_handlers:
-	rept 16 i {
+	rept 17 i {
 		dd IRQ # i # _handler
-	} 
+	}

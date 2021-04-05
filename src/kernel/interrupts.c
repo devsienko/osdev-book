@@ -29,10 +29,13 @@ void timer_int_handler();
 void init_interrupts() {
 	idt = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE | PAGE_GLOBAL);
 	memset(idt, 0, 256 * sizeof(IntDesc));
-	IDTR idtr = {256 * sizeof(IntDesc), idt};
+	IDTR idtr = { 256 * sizeof(IntDesc), idt };
+
 	asm("lidt (,%0,)"::"a"(&idtr));
+	
 	irq_base = 0x20;
-	irq_count = 16;
+	irq_count = 17;
+	
 	outportb(0x20, 0x11);
 	outportb(0x21, irq_base);
 	outportb(0x21, 4);
@@ -41,9 +44,9 @@ void init_interrupts() {
 	outportb(0xA1, irq_base + 8);
 	outportb(0xA1, 2);
 	outportb(0xA1, 1);
-	//set_int_handler(irq_base, timer_int_handler, 0x8E);
+
 	int i;
-	for (i = 0; i < 16; i++) {
+	for (i = 0; i < irq_count; i++) {
 		set_int_handler(irq_base + i, irq_handlers[i], 0x8E);
 	}
 	asm("sti");
@@ -71,6 +74,7 @@ void irq_handler(uint32 index, Registers *regs) {
 		case 6: 
 			i86_flpy_irq();
 			break;
-
+		case 16: 
+			printf("test oooyeaa");
 	}
 }
