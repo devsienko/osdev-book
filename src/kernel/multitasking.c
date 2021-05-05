@@ -2,6 +2,7 @@
 #include "memory_manager.h"
 #include "interrupts.h"
 #include "multitasking.h"
+#include "tty.h"
 
 TSS *tss = (void*)(USER_MEMORY_END - PAGE_SIZE * 3 + 1);
 
@@ -11,11 +12,15 @@ void init_multitasking() {
 	list_init(&process_list);
 	list_init(&thread_list);
 	kernel_process = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
-	init_kernel_address_space(&kernel_process->address_space, kernel_page_dir);
-	// alloc_virt_pages(&kernel_process->address_space, tss, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
-	// tss->esp0 = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE | PAGE_GLOBAL);
-	// tss->ss0 = 16;
-	// tss->io_map_offset = (uint32)((uint32)tss->io_map - (uint32)tss);
+	// we use init_address_space instead of init_kernel_address_space to allocate TSS 
+	// in user mode address space, after that we can change these settings
+	init_address_space(&kernel_process->address_space, kernel_page_dir);
+	
+	alloc_virt_pages(&kernel_process->address_space, tss, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);
+	tss->esp0 = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, PAGE_PRESENT | PAGE_WRITABLE | PAGE_GLOBAL);
+	tss->ss0 = 16; // see boot.asm "gdt data" label offset
+	tss->io_map_offset = (uint32)((uint32)tss->io_map - (uint32)tss);
+	
 	kernel_process->suspend = false;
 	kernel_process->thread_count = 1;
 	strncpy(kernel_process->name, "Kernel", sizeof(kernel_process->name));
@@ -27,12 +32,13 @@ void init_multitasking() {
 	list_append((List*)&thread_list, (ListItem*)kernel_thread);
 	current_process = kernel_process;
 	current_thread = kernel_thread;
-	asm("ltr %w0"::"a"(24));
+	asm("ltr %w0"::"a"(40));
 	multitasking_enabled = true;
 }
 
 void switch_task(Registers *regs) {
 	if (multitasking_enabled) {
+		set_kernel_stack(current_thread->state.esp);
 		memcpy(&current_thread->state, regs, sizeof(Registers));
 		do {
 			current_thread = (Thread*)current_thread->list_item.next;
@@ -41,6 +47,38 @@ void switch_task(Registers *regs) {
 		asm("movl %0, %%cr3"::"a"(current_process->address_space.page_dir));
 		memcpy(regs, &current_thread->state, sizeof(Registers));
 	}
+}
+
+void set_kernel_stack(uint32 stack)
+{
+    tss->esp0 = stack;
+}
+
+void switch_to_user_mode()
+{
+    // Set up our kernel stack.
+    set_kernel_stack(current_thread->state.esp + 0x1000);
+    
+    // Set up a stack structure for switching to user mode.
+    asm volatile("  \
+      cli; \
+      mov $0x23, %ax; \
+      mov %ax, %ds; \
+      mov %ax, %es; \
+      mov %ax, %fs; \
+      mov %ax, %gs; \
+                    \
+       \
+      mov %esp, %eax; \
+      pushl $0x23; \
+      pushl %esp; \
+      pushf; \
+      pushl $0x1B; \
+      push $1f; \
+      iret; \
+    1: \
+      "); 
+      
 }
 
 Thread *create_thread(Process *process, void *entry_point, size_t stack_size_in_pages, 

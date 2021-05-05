@@ -298,7 +298,7 @@ stage2:
 	mov dword[0x1FFC], 0x3000 + 111b ; last page table record, 8188 (0x1FFC) = 4096 (page directory base) + 4096 (page directory size) - 4 (size of one page directory record)
 	
 	; fill the first page table
-	mov eax, 11b
+	mov eax, 111b
 	mov cx, 0x100000 / 4096 ; map first 1 Mb
 	mov di, 0x2000 ; address (stosd)
  @@:
@@ -309,7 +309,7 @@ stage2:
 	; fill the last page table
 	mov di, 0x3000
 	mov eax, 0x11000
-	or eax, 11b
+	or eax, 111b
 	mov ecx, 1024 ; map whole table
   @@:
 	stosd
@@ -317,7 +317,7 @@ stage2:
 	loop @b
 	
 	; mov dword[0x3FF4], 0x4000 + 11b ; Kernel stack
-	mov dword[0x3FF8], 0x3000 + 11b ; Kernel page table, we use it as KERNEL_PAGE_TABLE
+	mov dword[0x3FF8], 0x3000 + 111b ; Kernel page table, we use it as KERNEL_PAGE_TABLE
 	
 	; load page directory to CR3
 	mov eax, 0x1000
@@ -352,7 +352,7 @@ dt_data:
 	dd 0 
  
 ; Offset 0x8 bytes from start of GDT: Descriptor code therfore is 8
- 
+
 ; gdt code:				; code descriptor
 	dw 0FFFFh 			; limit low
 	dw 0 				; base low
@@ -360,7 +360,7 @@ dt_data:
 	db 10011010b 		; access
 	db 11001111b 		; granularity
 	db 0 				; base high
- 
+
 ; Offset 16 bytes (0x10) from start of GDT. Descriptor code therfore is 0x10.
  
 ; gdt data:				; data descriptor
@@ -371,8 +371,13 @@ dt_data:
 	db 11001111b 		; granularity
 	db 0				; base high
 
+; user code segment
+	dq 0x00CFFA000000FFFF
+; user data segment
+	dq 0x00CFF2000000FFFF
+
 ; TSS:
-	dq 0x7F4089FFD0002FFF
+	dq 0x7F4089FFD0002FFF ; points to last three page of user address space
 
 gdtr_data:
 	dw $ - dt_data - 1
@@ -398,7 +403,7 @@ start32:
 
 	; put 'OK' to right bottom corner
 	mov byte[0xB8000 + (25 * 80 - 1) * 2], "K"
-	mov dword[0x3FFC], 0xB8000 + 11b ; map last page of last PTE to the video memory
+	mov dword[0x3FFC], 0xB8000 + 111b ; map last page of last PTE to the video memory
 	mov byte[0xFFFFF000 + (25 * 80 - 2) * 2], "O" ; display 'O' by above mapped memory
 	
 	; put the memory map address to ESI

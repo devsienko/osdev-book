@@ -51,8 +51,18 @@ void kernel_main(uint8 boot_disk_id, void *memory_map, uint64 first_file_sector_
 			cmd_get_ticks();
 		else if(!strcmp("ls", buffer))
 			show_files((uint32)first_file_sector_number);
-		else if(!strcmp("test", buffer))
+		else if(!strcmp("test", buffer)) {
+			// TSS *tss = (void*)(USER_MEMORY_END - PAGE_SIZE * 3 + 1);
+			// void *p = alloc_virt_pages(&kernel_process->address_space, tss, -1, 1, PAGE_PRESENT | PAGE_WRITABLE);	
+			// if(p == NULL)
+			// 	printf("\n\n!!!right!!!\n\n");
+			switch_to_user_mode();
+   			char *digits = "0123456789ABCDEF\n";
+			asm( "movl %0, %%ebx" : : "a" (digits) :); // syscall function parameter
+			asm ("movl $0, %eax"); // syscall function number
 			asm("int $0x30");//0x20 - irq_base, 16 - handler index, 0x20 + 16 = 0x30
+			asm("hlt");//0x20 - irq_base, 16 - handler index, 0x20 + 16 = 0x30
+		}
 		else 
 			printf("You typed: %s\n", buffer);
 	}
@@ -258,7 +268,7 @@ phyaddr init_paging_tables(phyaddr memory_location_start) {
 	//fill last page table
 	temp_map_page(last_table_phyaddr);
 	uint32 *last_table = (uint32*)TEMP_PAGE;
-	entry_value = 0x11000 | 3; // 0x11000 | 11b
+	entry_value = 0x11000 | 7; // 0x11000 | 11b
 	for (int i = 0; i < PAGES_PER_TABLE; i++) {
 		last_table[i] = entry_value;
 		entry_value += 0x1000;
@@ -266,13 +276,14 @@ phyaddr init_paging_tables(phyaddr memory_location_start) {
 
 	//map kernel stack
 	//last_table[1020] = 0x4000 | 3; //0x4000 + 11b
-	last_table[kernel_index] = 0x3000 | 3; //0x3000 + 11b
+	last_table[kernel_index] = 0x3000 | 7; //0x3000 + 11b
 
 	return page_dir;
 }
 
 phyaddr alloc_dma_buffer() {
-	phyaddr buffer = alloc_phys_pages_low(1);
+	// phyaddr buffer = alloc_phys_pages_low(1);
+	phyaddr buffer = 0x20000;
 	flpydsk_set_dma(buffer);
 	return buffer;
 }
@@ -285,8 +296,9 @@ void run_new_process(uint32 file_sector_number) {
 	uint32 file_data_sector_number = find_file(file_sector_number, file_name);
 	phyaddr process_base = alloc_dma_buffer();
 	(uint8*)flpydsk_read_sector(file_data_sector_number);
-		
-	phyaddr page_dir = init_paging_tables(0);
+	
+	// phyaddr page_dir = init_paging_tables(0x1ffff);
+	phyaddr page_dir = init_paging_tables(process_base - 1);
 	Process *new_process = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, 
 		PAGE_PRESENT | PAGE_WRITABLE);
 
@@ -297,8 +309,8 @@ void run_new_process(uint32 file_sector_number) {
 	new_process->suspend = suspend;
 	new_process->thread_count = 0;
 	strncpy(new_process->name, file_name, sizeof(new_process->name));
+
 	list_append((List*)&process_list, (ListItem*)new_process);
 
-	//0x20000 - first.asm is loaded there
-	create_thread(new_process, (void*)process_base, 1, true, suspend);
+	create_thread(new_process, (void*)1, 1, true, suspend);
 }

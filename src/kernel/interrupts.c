@@ -1,6 +1,7 @@
 #include "stdlib.h"
 #include "memory_manager.h"
 #include "interrupts.h"
+#include "syscall.h"
 #include "multitasking.h"
 #include "tty.h"
 #include "timer.h"
@@ -34,7 +35,7 @@ void init_interrupts() {
 	asm("lidt (,%0,)"::"a"(&idtr));
 	
 	irq_base = 0x20;
-	irq_count = 17;
+	irq_count = 16;
 	
 	outportb(0x20, 0x11);
 	outportb(0x21, irq_base);
@@ -49,6 +50,7 @@ void init_interrupts() {
 	for (i = 0; i < irq_count; i++) {
 		set_int_handler(irq_base + i, irq_handlers[i], 0x8E);
 	}
+	set_int_handler(irq_base + i, irq_handlers[i], 0xEE);
 	asm("sti");
 }
 
@@ -75,6 +77,6 @@ void irq_handler(uint32 index, Registers *regs) {
 			i86_flpy_irq();
 			break;
 		case 16: 
-			printf("test oooyeaa");
+			syscall_handler(regs);
 	}
 }
