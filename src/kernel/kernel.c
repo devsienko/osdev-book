@@ -210,6 +210,8 @@ phyaddr init_paging_tables(phyaddr memory_location_start) {
 	uint16 kernel_index = 1022;
 
 	phyaddr first_table_phyaddr = alloc_phys_pages(1);
+	phyaddr table_for_tss = alloc_phys_pages(1); //remove it after debugging
+	phyaddr page_for_tss = alloc_phys_pages(1); //remove it after debugging
 	phyaddr last_table_phyaddr = alloc_phys_pages(1);
 	phyaddr kernel_table_phyaddr = 0x03fec000;
 
@@ -218,6 +220,7 @@ phyaddr init_paging_tables(phyaddr memory_location_start) {
 	memset((void*)TEMP_PAGE, 0, PAGE_SIZE);
 
 	((uint32*)TEMP_PAGE)[0] = first_table_phyaddr | 7; // 7 == 111b
+	//((uint32*)TEMP_PAGE)[511] = table_for_tss | 7; //remove it after debugging
 	((uint32*)TEMP_PAGE)[kernel_index] = kernel_table_phyaddr | 7; // 7 == 111b
 	((uint32*)TEMP_PAGE)[1023] = last_table_phyaddr | 7; // 7 == 111b
 
@@ -229,7 +232,7 @@ phyaddr init_paging_tables(phyaddr memory_location_start) {
 	uint32 video_memoty_end = 0xC0000;
 
 	//fill before video memory
-	uint32 entry_value = memory_location_start | 3; //3 = 11b
+	uint32 entry_value = memory_location_start | 7; //3 = 11b
 	uint16 entries_count = video_memoty_start / PAGE_SIZE;
 	for (int i = 0; i < entries_count; i++) {
 		first_table[i] = entry_value;
@@ -238,7 +241,7 @@ phyaddr init_paging_tables(phyaddr memory_location_start) {
 
 	//fill video memory, because we cannot access it in another case
 	uint16 prev_entries_count = entries_count;
-	uint32 video_memory_entry_value = video_memoty_start | 3; //3 = 11b
+	uint32 video_memory_entry_value = video_memoty_start | 7; //3 = 11b
 	entries_count = prev_entries_count + ((video_memoty_end - video_memoty_start) / PAGE_SIZE);
 	for (int i = prev_entries_count; i < entries_count; i++) {
 		first_table[i] = video_memory_entry_value;
@@ -264,13 +267,22 @@ phyaddr init_paging_tables(phyaddr memory_location_start) {
 		first_table[i] = entry_value;
 		entry_value += 0x1000;
 	}
-
+	
 	//fill last page table
 	temp_map_page(last_table_phyaddr);
 	uint32 *last_table = (uint32*)TEMP_PAGE;
 	entry_value = 0x11000 | 7; // 0x11000 | 11b
 	for (int i = 0; i < PAGES_PER_TABLE; i++) {
 		last_table[i] = entry_value;
+		entry_value += 0x1000;
+	}
+
+	//fill table_for_gdt - todo: remove it
+	temp_map_page(table_for_tss);
+	uint32 *table_for_tss_p = (uint32*)TEMP_PAGE;
+	entry_value = page_for_tss | 7;
+	for (int i = 0; i < PAGES_PER_TABLE; i++) {
+		table_for_tss_p[i] = entry_value;
 		entry_value += 0x1000;
 	}
 
@@ -298,7 +310,7 @@ void run_new_process(uint32 file_sector_number) {
 	(uint8*)flpydsk_read_sector(file_data_sector_number);
 	
 	// phyaddr page_dir = init_paging_tables(0x1ffff);
-	phyaddr page_dir = init_paging_tables(process_base - 1);
+	phyaddr page_dir = init_paging_tables(0);
 	Process *new_process = alloc_virt_pages(&kernel_address_space, NULL, -1, 1, 
 		PAGE_PRESENT | PAGE_WRITABLE);
 
@@ -312,5 +324,5 @@ void run_new_process(uint32 file_sector_number) {
 
 	list_append((List*)&process_list, (ListItem*)new_process);
 
-	create_thread(new_process, (void*)1, 1, true, suspend);
+	create_thread(new_process, (void*)process_base, 1, true, suspend);
 }
